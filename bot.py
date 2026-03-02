@@ -30,6 +30,15 @@ async def init_db():
             shanbalik_date TEXT
         )
         """)
+        await db.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE,
+    full_name TEXT,
+    username TEXT,
+    joined_at TEXT
+)
+""")
         await db.commit()
 
 async def add_student(name, date):
