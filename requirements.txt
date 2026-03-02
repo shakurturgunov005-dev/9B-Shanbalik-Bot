@@ -1,5 +1,1 @@
-aiogram
-fastapi
-uvicorn
-aiosqlite
-apscheduler
+asyncpg
