@@ -1,16 +1,20 @@
+import os
 import datetime
 import aiosqlite
-import os
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
+from aiogram.types import Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 GROUP_ID = os.getenv("GROUP_ID")
 ADMIN_USERNAME = "muhibillaevich"
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
+app = FastAPI()
 scheduler = AsyncIOScheduler()
 
 DB_NAME = "shanbalik.db"
@@ -69,105 +73,70 @@ def is_admin(message: types.Message):
 
 # ---------------- COMMANDS ----------------
 
-@dp.message_handler(commands=['start'])
-async def start(message: types.Message):
-    await message.answer("🤖 9B Shanbalik Bot ishga tushdi!")
+@dp.message()
+async def handle_message(message: types.Message):
+    text = message.text
 
-@dp.message_handler(commands=['help'])
-async def help_cmd(message: types.Message):
-    await message.answer(
-        "/navbat - Eng yaqin navbatchi\n"
-        "/list - Barcha ro‘yxat\n"
-        "Admin:\n"
-        "/add Ism 1 mart 2026\n"
-        "/delete ID yoki Ism"
-    )
+    if text == "/start":
+        return await message.answer("Bot 24/7 ishlayapti 🚀")
 
-# ---------- ADD (natural date) ----------
+    if text == "/list":
+        students = await get_all_students()
+        if not students:
+            return await message.answer("Ro‘yxat bo‘sh.")
+        msg = ""
+        for s in students:
+            msg += f"{s[0]}. {s[1]} - {s[2]}\n"
+        return await message.answer(msg)
 
-@dp.message_handler(commands=['add'])
-async def add_cmd(message: types.Message):
-    if not is_admin(message):
-        return await message.answer("⛔ Siz admin emassiz.")
+    if text == "/navbat":
+        student = await get_next_student()
+        if not student:
+            return await message.answer("Navbat topilmadi.")
+        name, date = student
+        today = datetime.date.today()
+        remaining = (datetime.date.fromisoformat(date) - today).days
+        return await message.answer(
+            f"{name}\nSana: {date}\nQolgan kun: {remaining}"
+        )
 
-    try:
-        parts = message.text.split()
-        name = parts[1]
-        day = int(parts[2])
-        month_text = parts[3].lower()
-        year = int(parts[4])
+    if text.startswith("/add"):
+        if not is_admin(message):
+            return await message.answer("Admin emas.")
+        try:
+            parts = text.split()
+            name = parts[1]
+            day = int(parts[2])
+            month_text = parts[3].lower()
+            year = int(parts[4])
 
-        months = {
-            "yanvar": 1, "fevral": 2, "mart": 3, "aprel": 4,
-            "may": 5, "iyun": 6, "iyul": 7, "avgust": 8,
-            "sentyabr": 9, "oktyabr": 10, "noyabr": 11, "dekabr": 12
-        }
+            months = {
+                "yanvar":1,"fevral":2,"mart":3,"aprel":4,
+                "may":5,"iyun":6,"iyul":7,"avgust":8,
+                "sentyabr":9,"oktyabr":10,"noyabr":11,"dekabr":12
+            }
 
-        month = months.get(month_text)
-        if not month:
-            return await message.answer("❌ Oy nomi noto‘g‘ri.")
+            month = months.get(month_text)
+            date = datetime.date(year, month, day)
+            await add_student(name, date.isoformat())
+            return await message.answer("Qo‘shildi.")
+        except:
+            return await message.answer("Format: /add Ali 1 mart 2026")
 
-        date = datetime.date(year, month, day)
-        await add_student(name, date.isoformat())
-        await message.answer("✅ Navbatchi qo‘shildi.")
+    if text.startswith("/delete"):
+        if not is_admin(message):
+            return await message.answer("Admin emas.")
+        try:
+            value = text.split()[1]
+            if value.isdigit():
+                await delete_student_by_id(int(value))
+            else:
+                await delete_student_by_name(value)
+            return await message.answer("O‘chirildi.")
+        except:
+            return await message.answer("Format: /delete ID yoki Ism")
 
-    except:
-        await message.answer("Format: /add Ali 1 mart 2026")
-
-# ---------- DELETE (ID yoki name) ----------
-
-@dp.message_handler(commands=['delete'])
-async def delete_cmd(message: types.Message):
-    if not is_admin(message):
-        return await message.answer("⛔ Siz admin emassiz.")
-
-    try:
-        value = message.text.split()[1]
-
-        if value.isdigit():
-            await delete_student_by_id(int(value))
-        else:
-            await delete_student_by_name(value)
-
-        await message.answer("🗑 O‘chirildi.")
-
-    except:
-        await message.answer("Format: /delete ID yoki Ism")
-
-# ---------- LIST ----------
-
-@dp.message_handler(commands=['list'])
-async def list_cmd(message: types.Message):
-    students = await get_all_students()
-    if not students:
-        return await message.answer("Ro‘yxat bo‘sh.")
-
-    text = "📋 Shanbalik ro‘yxati 2026:\n\n"
-    for s in students:
-        text += f"{s[0]}. {s[1]} - {s[2]}\n"
-
-    await message.answer(text)
-
-# ---------- NAVBAT ----------
-
-@dp.message_handler(commands=['navbat'])
-async def navbat_cmd(message: types.Message):
-    student = await get_next_student()
-    if not student:
-        return await message.answer("Navbat topilmadi.")
-
-    name, date = student
-    today = datetime.date.today()
-    remaining = (datetime.date.fromisoformat(date) - today).days
-
-    await message.answer(
-        f"🟢 Eng yaqin navbatchi:\n\n"
-        f"👤 {name}\n"
-        f"📅 {date}\n"
-        f"⏳ Qolgan kun: {remaining}"
-    )
-
-# ---------- MONTHLY REMINDER ----------
+# ---------------- REMINDER ----------------
 
 async def monthly_reminder():
     student = await get_next_student()
@@ -175,13 +144,25 @@ async def monthly_reminder():
         name, date = student
         await bot.send_message(
             chat_id=GROUP_ID,
-            text=f"🔔 Eslatma!\n{name} ning shanbaligi {date} kuni."
+            text=f"Eslatma: {name} - {date}"
         )
 
-async def on_startup(dp):
+# ---------------- WEBHOOK ----------------
+
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    data = await request.json()
+    update = Update.model_validate(data)
+    await dp.feed_update(bot, update)
+    return JSONResponse({"ok": True})
+
+@app.on_event("startup")
+async def on_startup():
     await init_db()
     scheduler.add_job(monthly_reminder, "cron", day=28, hour=8, minute=0)
     scheduler.start()
+    await bot.set_webhook(WEBHOOK_URL)
 
-if __name__ == "__main__":
-    executor.start_polling(dp, on_startup=on_startup)
+@app.on_event("shutdown")
+async def on_shutdown():
+    await bot.delete_webhook()
