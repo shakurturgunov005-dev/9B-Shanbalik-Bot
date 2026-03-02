@@ -219,10 +219,6 @@ async def on_startup():
     scheduler.start()
     await bot.set_webhook(WEBHOOK_URL)
 
-@app.on_event("shutdown")
-async def on_shutdown():
-    await bot.delete_webhook()
-
 # ================== RUN ==================
 
 if __name__ == "__main__":
