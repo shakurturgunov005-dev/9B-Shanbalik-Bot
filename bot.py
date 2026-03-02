@@ -6,6 +6,9 @@ from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import uvicorn
+
+# ================== CONFIG ==================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
@@ -19,7 +22,7 @@ scheduler = AsyncIOScheduler()
 
 DB_NAME = "shanbalik.db"
 
-# ---------------- DATABASE ----------------
+# ================== DATABASE ==================
 
 async def init_db():
     async with aiosqlite.connect(DB_NAME) as db:
@@ -30,16 +33,41 @@ async def init_db():
             shanbalik_date TEXT
         )
         """)
+
         await db.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE,
-    full_name TEXT,
-    username TEXT,
-    joined_at TEXT
-)
-""")
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE,
+            full_name TEXT,
+            username TEXT,
+            joined_at TEXT
+        )
+        """)
         await db.commit()
+
+async def add_user(user):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+        INSERT OR IGNORE INTO users (user_id, full_name, username, joined_at)
+        VALUES (?, ?, ?, ?)
+        """, (
+            user.id,
+            user.full_name,
+            user.username,
+            datetime.datetime.now().isoformat()
+        ))
+        await db.commit()
+
+async def get_user_count():
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT COUNT(*) FROM users")
+        result = await cursor.fetchone()
+        return result[0]
+
+async def get_all_users():
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT user_id FROM users")
+        return await cursor.fetchall()
 
 async def add_student(name, date):
     async with aiosqlite.connect(DB_NAME) as db:
@@ -75,19 +103,38 @@ async def get_next_student():
         )
         return await cursor.fetchone()
 
-# ---------------- ADMIN ----------------
+# ================== ADMIN ==================
 
 def is_admin(message: types.Message):
     return message.from_user.username == ADMIN_USERNAME
 
-# ---------------- COMMANDS ----------------
+# ================== COMMANDS ==================
 
 @dp.message()
 async def handle_message(message: types.Message):
+    await add_user(message.from_user)
     text = message.text
 
     if text == "/start":
         return await message.answer("Bot 24/7 ishlayapti 🚀")
+
+    if text == "/admin":
+        if not is_admin(message):
+            return await message.answer("Admin emas.")
+        count = await get_user_count()
+        return await message.answer(f"👥 Foydalanuvchilar soni: {count}")
+
+    if text.startswith("/broadcast"):
+        if not is_admin(message):
+            return await message.answer("Admin emas.")
+        msg = text.replace("/broadcast ", "")
+        users = await get_all_users()
+        for u in users:
+            try:
+                await bot.send_message(u[0], msg)
+            except:
+                pass
+        return await message.answer("Yuborildi.")
 
     if text == "/list":
         students = await get_all_students()
@@ -145,7 +192,7 @@ async def handle_message(message: types.Message):
         except:
             return await message.answer("Format: /delete ID yoki Ism")
 
-# ---------------- REMINDER ----------------
+# ================== REMINDER ==================
 
 async def monthly_reminder():
     student = await get_next_student()
@@ -153,10 +200,10 @@ async def monthly_reminder():
         name, date = student
         await bot.send_message(
             chat_id=GROUP_ID,
-            text=f"Eslatma: {name} - {date}"
+            text=f"📢 28-kun eslatma:\n{name} - {date}"
         )
 
-# ---------------- WEBHOOK ----------------
+# ================== WEBHOOK ==================
 
 @app.post("/webhook")
 async def webhook_handler(request: Request):
@@ -175,9 +222,8 @@ async def on_startup():
 @app.on_event("shutdown")
 async def on_shutdown():
     await bot.delete_webhook()
-    
-    import uvicorn
-import os
+
+# ================== RUN ==================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
