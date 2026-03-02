@@ -142,7 +142,7 @@ async def list_cmd(message: types.Message):
     if not students:
         return await message.answer("Ro‘yxat bo‘sh.")
 
-    text = "📋 Shanbalik ro‘yxati:\n\n"
+    text = "📋 Shanbalik ro‘yxati 2026:\n\n"
     for s in students:
         text += f"{s[0]}. {s[1]} - {s[2]}\n"
 
