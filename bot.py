@@ -15,7 +15,7 @@ scheduler = AsyncIOScheduler()
 
 DB_NAME = "shanbalik.db"
 
-# ---------- DATABASE ----------
+# ---------------- DATABASE ----------------
 
 async def init_db():
     async with aiosqlite.connect(DB_NAME) as db:
@@ -36,9 +36,14 @@ async def add_student(name, date):
         )
         await db.commit()
 
-async def delete_student(student_id):
+async def delete_student_by_id(student_id):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("DELETE FROM students WHERE id = ?", (student_id,))
+        await db.commit()
+
+async def delete_student_by_name(name):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("DELETE FROM students WHERE name = ?", (name,))
         await db.commit()
 
 async def get_all_students():
@@ -57,25 +62,28 @@ async def get_next_student():
         )
         return await cursor.fetchone()
 
-# ---------- ADMIN CHECK ----------
+# ---------------- ADMIN ----------------
 
 def is_admin(message: types.Message):
     return message.from_user.username == ADMIN_USERNAME
 
-# ---------- COMMANDS ----------
+# ---------------- COMMANDS ----------------
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    await message.answer("🤖 9B Shanbalik Premium Bot ishga tushdi!")
+    await message.answer("🤖 9B Shanbalik Bot ishga tushdi!")
 
 @dp.message_handler(commands=['help'])
 async def help_cmd(message: types.Message):
     await message.answer(
         "/navbat - Eng yaqin navbatchi\n"
         "/list - Barcha ro‘yxat\n"
-        "Admin: /add Ism YYYY-MM-DD\n"
-        "Admin: /delete ID"
+        "Admin:\n"
+        "/add Ism 1 mart 2026\n"
+        "/delete ID yoki Ism"
     )
+
+# ---------- ADD (natural date) ----------
 
 @dp.message_handler(commands=['add'])
 async def add_cmd(message: types.Message):
@@ -83,12 +91,30 @@ async def add_cmd(message: types.Message):
         return await message.answer("⛔ Siz admin emassiz.")
 
     try:
-        _, name, date = message.text.split()
-        datetime.date.fromisoformat(date)
-        await add_student(name, date)
+        parts = message.text.split()
+        name = parts[1]
+        day = int(parts[2])
+        month_text = parts[3].lower()
+        year = int(parts[4])
+
+        months = {
+            "yanvar": 1, "fevral": 2, "mart": 3, "aprel": 4,
+            "may": 5, "iyun": 6, "iyul": 7, "avgust": 8,
+            "sentyabr": 9, "oktyabr": 10, "noyabr": 11, "dekabr": 12
+        }
+
+        month = months.get(month_text)
+        if not month:
+            return await message.answer("❌ Oy nomi noto‘g‘ri.")
+
+        date = datetime.date(year, month, day)
+        await add_student(name, date.isoformat())
         await message.answer("✅ Navbatchi qo‘shildi.")
+
     except:
-        await message.answer("Format: /add Ism YYYY-MM-DD")
+        await message.answer("Format: /add Ali 1 mart 2026")
+
+# ---------- DELETE (ID yoki name) ----------
 
 @dp.message_handler(commands=['delete'])
 async def delete_cmd(message: types.Message):
@@ -96,11 +122,19 @@ async def delete_cmd(message: types.Message):
         return await message.answer("⛔ Siz admin emassiz.")
 
     try:
-        _, student_id = message.text.split()
-        await delete_student(int(student_id))
+        value = message.text.split()[1]
+
+        if value.isdigit():
+            await delete_student_by_id(int(value))
+        else:
+            await delete_student_by_name(value)
+
         await message.answer("🗑 O‘chirildi.")
+
     except:
-        await message.answer("Format: /delete ID")
+        await message.answer("Format: /delete ID yoki Ism")
+
+# ---------- LIST ----------
 
 @dp.message_handler(commands=['list'])
 async def list_cmd(message: types.Message):
@@ -111,7 +145,10 @@ async def list_cmd(message: types.Message):
     text = "📋 Shanbalik ro‘yxati:\n\n"
     for s in students:
         text += f"{s[0]}. {s[1]} - {s[2]}\n"
+
     await message.answer(text)
+
+# ---------- NAVBAT ----------
 
 @dp.message_handler(commands=['navbat'])
 async def navbat_cmd(message: types.Message):
@@ -130,7 +167,7 @@ async def navbat_cmd(message: types.Message):
         f"⏳ Qolgan kun: {remaining}"
     )
 
-# ---------- MONTHLY REMINDER (28th) ----------
+# ---------- MONTHLY REMINDER ----------
 
 async def monthly_reminder():
     student = await get_next_student()
