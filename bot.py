@@ -21,7 +21,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-ADMIN_IDS = [6042457335]
+ADMIN_IDS = [6042457335]  # O'zingizni ID
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -51,7 +51,6 @@ def group_keyboard():
         resize_keyboard=True
     )
 
-
 def admin_private_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -80,16 +79,6 @@ async def init_db():
         """)
 
         await conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            user_id BIGINT UNIQUE,
-            full_name TEXT,
-            username TEXT,
-            joined_at TIMESTAMP
-        )
-        """)
-
-        await conn.execute("""
         CREATE TABLE IF NOT EXISTS shanbalik_history (
             id SERIAL PRIMARY KEY,
             name TEXT,
@@ -97,14 +86,6 @@ async def init_db():
             completed_at TIMESTAMP
         )
         """)
-
-async def add_user(user):
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-        INSERT INTO users (user_id, full_name, username, joined_at)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (user_id) DO NOTHING
-        """, user.id, user.full_name, user.username, datetime.datetime.utcnow())
 
 async def add_student(name, date):
     async with db_pool.acquire() as conn:
@@ -133,15 +114,15 @@ async def delete_student_by_id(student_id):
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM students WHERE id=$1", student_id)
 
-async def archive_completed_shanbalik():
+async def archive_completed():
     async with db_pool.acquire() as conn:
-        completed = await conn.fetch("""
+        rows = await conn.fetch("""
             SELECT id, name, shanbalik_date
             FROM students
             WHERE shanbalik_date < CURRENT_DATE
         """)
 
-        for row in completed:
+        for row in rows:
             await conn.execute("""
                 INSERT INTO shanbalik_history (name, shanbalik_date, completed_at)
                 VALUES ($1, $2, $3)
@@ -156,7 +137,6 @@ async def archive_completed_shanbalik():
 
 @dp.message()
 async def handle_message(message: types.Message):
-    await add_user(message.from_user)
     text = message.text
     if not text:
         return
@@ -164,61 +144,52 @@ async def handle_message(message: types.Message):
     # START
     if text == "/start":
 
-    # Agar guruh bo‘lsa
-    if message.chat.type in ["group", "supergroup"]:
-        return await message.answer(
-            "Sinf menyusi 📚",
-            reply_markup=group_keyboard()
-        )
-
-    # Agar private chat bo‘lsa
-    if message.chat.type == "private":
-
-        if is_admin(message):
-            return await message.answer(
-                "Admin panel 🔐",
-                reply_markup=admin_private_keyboard()
-            )
-        else:
+        if message.chat.type in ["group", "supergroup"]:
             return await message.answer(
                 "Sinf menyusi 📚",
                 reply_markup=group_keyboard()
             )
+
+        if message.chat.type == "private":
+
+            if is_admin(message):
+                return await message.answer(
+                    "Admin panel 🔐",
+                    reply_markup=admin_private_keyboard()
+                )
+            else:
+                return await message.answer(
+                    "Sinf menyusi 📚",
+                    reply_markup=group_keyboard()
+                )
 
     # NAVBAT
     if text == "📅 Navbat" or text == "/navbat":
         student = await get_next_student()
         if not student:
             return await message.answer("Navbat topilmadi.")
+
         remaining = (student["shanbalik_date"] - datetime.date.today()).days
+
         return await message.answer(
             f"{student['name']}\n"
             f"{format_date_uz(student['shanbalik_date'])}\n"
             f"Qolgan kun: {remaining}"
         )
 
-    # LIST
+    # RO'YXAT (guruh va private oddiy)
     if text == "📋 Ro‘yxat" or text == "/list":
         students = await get_all_students()
         if not students:
             return await message.answer("Ro‘yxat bo‘sh.")
 
-        for s in students:
-            keyboard = None
-            if is_admin(message):
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(
-                        text="❌ O‘chirish",
-                        callback_data=f"delete_{s['id']}"
-                    )]
-                ])
+        msg = "\n".join(
+            f"{s['name']} - {format_date_uz(s['shanbalik_date'])}"
+            for s in students
+        )
+        return await message.answer(msg)
 
-            await message.answer(
-                f"{s['name']} - {format_date_uz(s['shanbalik_date'])}",
-                reply_markup=keyboard
-            )
-
-    # HISTORY
+    # TARIX
     if text == "📚 Tarix" or text == "/history":
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("""
@@ -237,10 +208,45 @@ async def handle_message(message: types.Message):
         )
         return await message.answer(msg)
 
+    # ADMIN – QO‘SHISH
+    if text == "➕ O‘quvchi qo‘shish":
+        if not is_admin(message) or message.chat.type != "private":
+            return await message.answer("Ruxsat yo‘q ❌")
+
+        return await message.answer("Ism va sanani yuboring:\nMasalan: Ali, 2026-09-01")
+
+    # ADMIN – O‘CHIRISH PANEL
+    if text == "❌ O‘quvchi o‘chirish":
+        if not is_admin(message) or message.chat.type != "private":
+            return await message.answer("Ruxsat yo‘q ❌")
+
+        students = await get_all_students()
+        for s in students:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="❌ O‘chirish",
+                    callback_data=f"delete_{s['id']}"
+                )]
+            ])
+
+            await message.answer(
+                f"{s['name']} - {format_date_uz(s['shanbalik_date'])}",
+                reply_markup=keyboard
+            )
+
 # ================= CALLBACK =================
 
 @dp.callback_query()
 async def handle_callback(callback: types.CallbackQuery):
+
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Siz admin emassiz ❌", show_alert=True)
+        return
+
+    if callback.message.chat.type != "private":
+        await callback.answer("Faqat private chatda ❌", show_alert=True)
+        return
+
     data = callback.data
 
     if data.startswith("delete_"):
@@ -252,7 +258,7 @@ async def handle_callback(callback: types.CallbackQuery):
 # ================= REMINDER =================
 
 async def daily_reminder():
-    await archive_completed_shanbalik()
+    await archive_completed()
 
     student = await get_next_student()
     if not student:
