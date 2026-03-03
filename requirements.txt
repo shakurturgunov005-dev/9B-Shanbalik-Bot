@@ -1,1 +1,5 @@
+fastapi
+uvicorn
+aiogram
+apscheduler
 asyncpg
