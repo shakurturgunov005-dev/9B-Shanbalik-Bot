@@ -102,6 +102,7 @@ def is_admin(message: types.Message):
 @dp.message()
 async def handle_message(message: types.Message):
     try:
+        print("USER ID:", message.from_user.id)
         await add_user(message.from_user)
         text = message.text
 
