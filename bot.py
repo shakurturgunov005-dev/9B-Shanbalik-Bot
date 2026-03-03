@@ -311,7 +311,7 @@ async def on_startup():
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
 
-    scheduler.add_job(monthly_reminder, "cron", day=28, hour=8, minute=0)
+    scheduler.add_job(daily_reminder, "cron", hour=8, minute=0)
     scheduler.start()
 
     await bot.set_webhook(WEBHOOK_URL)
