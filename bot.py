@@ -95,7 +95,7 @@ async def delete_student_by_name(name):
 # ================= ADMIN =================
 
 def is_admin(message: types.Message):
-    return message.from_user.username == ADMIN_USERNAME
+    return message.from_user.id in ADMIN_IDS
 
 # ================= COMMANDS =================
 
