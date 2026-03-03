@@ -254,7 +254,32 @@ async def handle_message(message: types.Message):
 
 # ================= REMINDER =================
 
-async def monthly_reminder():
+async def daily_reminder():
+    student = await get_next_student()
+    if not student or not GROUP_ID:
+        return
+
+    today = datetime.date.today()
+    target_date = student["shanbalik_date"]
+    remaining = (target_date - today).days
+
+    if remaining == 3:
+        await bot.send_message(
+            chat_id=int(GROUP_ID),
+            text=f"⏳ 3 kun qoldi!\nNavbat: {student['name']}\nSana: {target_date}"
+        )
+
+    elif remaining == 1:
+        await bot.send_message(
+            chat_id=int(GROUP_ID),
+            text=f"⚠️ Ertaga shanbalik!\nNavbat: {student['name']}\nSana: {target_date}"
+        )
+
+    elif remaining == 0:
+        await bot.send_message(
+            chat_id=int(GROUP_ID),
+            text=f"📢 Bugun shanbalik!\nNavbat: {student['name']}"
+        )
     try:
         student = await get_next_student()
         if student and GROUP_ID:
