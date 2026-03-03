@@ -12,7 +12,7 @@ import uvicorn
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-GROUP_ID = os.getenv("GROUP_ID")
+GROUP_ID = int(os.getenv("GROUP_ID"))
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 ADMIN_IDS = [6042457335]
@@ -23,6 +23,16 @@ app = FastAPI()
 scheduler = AsyncIOScheduler()
 
 db_pool = None
+
+# ================= DATE FORMAT =================
+
+def format_date_uz(date_obj):
+    months = {
+        1: "yanvar", 2: "fevral", 3: "mart", 4: "aprel",
+        5: "may", 6: "iyun", 7: "iyul", 8: "avgust",
+        9: "sentyabr", 10: "oktyabr", 11: "noyabr", 12: "dekabr"
+    }
+    return f"{date_obj.day}-{months[date_obj.month]} {date_obj.year}"
 
 # ================= DATABASE =================
 
@@ -43,6 +53,15 @@ async def init_db():
             full_name TEXT,
             username TEXT,
             joined_at TIMESTAMP
+        )
+        """)
+
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS shanbalik_history (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            shanbalik_date DATE,
+            completed_at TIMESTAMP
         )
         """)
 
@@ -107,22 +126,29 @@ async def delete_student_by_name(name):
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM students WHERE name=$1", name)
 
+async def archive_completed_shanbalik():
+    async with db_pool.acquire() as conn:
+        completed = await conn.fetch("""
+            SELECT id, name, shanbalik_date
+            FROM students
+            WHERE shanbalik_date < CURRENT_DATE
+        """)
+
+        for row in completed:
+            await conn.execute("""
+                INSERT INTO shanbalik_history (name, shanbalik_date, completed_at)
+                VALUES ($1, $2, $3)
+            """, row["name"], row["shanbalik_date"], datetime.datetime.utcnow())
+
+            await conn.execute(
+                "DELETE FROM students WHERE id=$1",
+                row["id"]
+            )
+
 # ================= ADMIN =================
 
 def is_admin(message: types.Message):
     return message.from_user.id in ADMIN_IDS
-
-# ================= ERROR MONITORING =================
-
-async def notify_admin_error(error_text: str):
-    for admin_id in ADMIN_IDS:
-        try:
-            await bot.send_message(
-                admin_id,
-                f"🚨 BOT XATOLIK!\n\n{error_text}"
-            )
-        except:
-            pass
 
 # ================= COMMANDS =================
 
@@ -135,7 +161,9 @@ async def handle_message(message: types.Message):
         if not text:
             return
 
-        # ===== PRO ADMIN DASHBOARD =====
+        if text == "/start":
+            return await message.answer("Bot 24/7 ishlayapti 🚀")
+
         if text == "/admin":
             if not is_admin(message):
                 return await message.answer("Admin emas.")
@@ -152,30 +180,12 @@ async def handle_message(message: types.Message):
                 navbat_info = "Navbat topilmadi"
 
             return await message.answer(
-                f"🔐 SINF BOSHQARUV PANELI\n\n"
-                f"👥 Umumiy foydalanuvchilar: {total}\n"
-                f"📅 Bugungi qo‘shilganlar: {today}\n"
-                f"📈 Oxirgi 7 kun: {last7}\n"
-                f"🗓 Navbatdagi shanbalik: {navbat_info}"
+                f"🔐 ADMIN PANEL\n\n"
+                f"👥 Umumiy: {total}\n"
+                f"📅 Bugun: {today}\n"
+                f"📈 7 kun: {last7}\n"
+                f"🗓 Navbat: {navbat_info}"
             )
-
-        if text == "/start":
-            return await message.answer("Bot 24/7 ishlayapti 🚀")
-
-        if text.startswith("/broadcast"):
-            if not is_admin(message):
-                return await message.answer("Admin emas.")
-
-            msg = text.replace("/broadcast ", "")
-            users = await get_all_users()
-
-            for u in users:
-                try:
-                    await bot.send_message(u["user_id"], msg)
-                except:
-                    pass
-
-            return await message.answer("Xabar yuborildi ✅")
 
         if text == "/list":
             students = await get_all_students()
@@ -183,7 +193,7 @@ async def handle_message(message: types.Message):
                 return await message.answer("Ro‘yxat bo‘sh.")
 
             msg = "\n".join(
-                f"{s['id']}. {s['name']} - {s['shanbalik_date']}"
+                f"{s['id']}. {s['name']} - {format_date_uz(s['shanbalik_date'])}"
                 for s in students
             )
             return await message.answer(msg)
@@ -194,12 +204,31 @@ async def handle_message(message: types.Message):
                 return await message.answer("Navbat topilmadi.")
 
             remaining = (student["shanbalik_date"] - datetime.date.today()).days
+            formatted_date = format_date_uz(student["shanbalik_date"])
 
             return await message.answer(
                 f"{student['name']}\n"
-                f"Sana: {student['shanbalik_date']}\n"
+                f"Sana: {formatted_date}\n"
                 f"Qolgan kun: {remaining}"
             )
+
+        if text == "/history":
+            async with db_pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT name, shanbalik_date
+                    FROM shanbalik_history
+                    ORDER BY completed_at DESC
+                    LIMIT 10
+                """)
+
+            if not rows:
+                return await message.answer("Tarix bo‘sh.")
+
+            msg = "\n".join(
+                f"{r['name']} - {format_date_uz(r['shanbalik_date'])}"
+                for r in rows
+            )
+            return await message.answer(f"📚 Oxirgi 10 ta:\n\n{msg}")
 
         if text.startswith("/add"):
             if not is_admin(message):
@@ -220,7 +249,7 @@ async def handle_message(message: types.Message):
 
                 month = months.get(month_text)
                 if not month:
-                    return await message.answer("Oy noto‘g‘ri yozilgan.")
+                    return await message.answer("Oy noto‘g‘ri.")
 
                 date = datetime.date(year, month, day)
                 await add_student(name, date)
@@ -248,62 +277,39 @@ async def handle_message(message: types.Message):
                 return await message.answer("Format: /delete ID yoki Ism")
 
     except Exception as e:
-        error_text = f"{type(e).__name__}: {e}"
-        print("ERROR:", error_text)
-        await notify_admin_error(error_text)
+        print("ERROR:", e)
 
 # ================= REMINDER =================
 
 async def daily_reminder():
+    await archive_completed_shanbalik()
+
     student = await get_next_student()
-    if not student or not GROUP_ID:
+    if not student:
         return
 
     today = datetime.date.today()
     target_date = student["shanbalik_date"]
     remaining = (target_date - today).days
+    formatted_date = format_date_uz(target_date)
 
     if remaining == 3:
-        await bot.send_message(
-            chat_id=int(GROUP_ID),
-            text=f"⏳ 3 kun qoldi!\nNavbat: {student['name']}\nSana: {target_date}"
-        )
+        await bot.send_message(GROUP_ID, f"⏳ 3 kun qoldi!\n{student['name']}\n{formatted_date}")
 
     elif remaining == 1:
-        await bot.send_message(
-            chat_id=int(GROUP_ID),
-            text=f"⚠️ Ertaga shanbalik!\nNavbat: {student['name']}\nSana: {target_date}"
-        )
+        await bot.send_message(GROUP_ID, f"⚠️ Ertaga!\n{student['name']}\n{formatted_date}")
 
     elif remaining == 0:
-        await bot.send_message(
-            chat_id=int(GROUP_ID),
-            text=f"📢 Bugun shanbalik!\nNavbat: {student['name']}"
-        )
-    try:
-        student = await get_next_student()
-        if student and GROUP_ID:
-            await bot.send_message(
-                chat_id=int(GROUP_ID),
-                text=f"📢 28-kun eslatma:\n{student['name']} - {student['shanbalik_date']}"
-            )
-    except Exception as e:
-        await notify_admin_error(f"REMINDER ERROR: {e}")
+        await bot.send_message(GROUP_ID, f"📢 Bugun!\n{student['name']}")
 
 # ================= WEBHOOK =================
 
 @app.post("/webhook")
 async def webhook_handler(request: Request):
-    try:
-        data = await request.json()
-        update = Update.model_validate(data)
-        await dp.feed_update(bot, update)
-        return JSONResponse({"ok": True})
-    except Exception as e:
-        error_text = f"WEBHOOK ERROR: {type(e).__name__}: {e}"
-        print(error_text)
-        await notify_admin_error(error_text)
-        return JSONResponse({"ok": False})
+    data = await request.json()
+    update = Update.model_validate(data)
+    await dp.feed_update(bot, update)
+    return JSONResponse({"ok": True})
 
 @app.on_event("startup")
 async def on_startup():
@@ -315,8 +321,6 @@ async def on_startup():
     scheduler.start()
 
     await bot.set_webhook(WEBHOOK_URL)
-
-# ================= RUN =================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
