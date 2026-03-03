@@ -1,3 +1,4 @@
+import asyncio
 import os
 import datetime
 import asyncpg
@@ -137,7 +138,21 @@ async def archive_completed():
 
 @dp.message()
 async def handle_message(message: types.Message):
+        # ===== SLASH BUYRUQLARNI 2 SONIYADA O‘CHIRISH =====
+    if message.text and message.text.startswith("/"):
+
+        async def delete_later(msg):
+            await asyncio.sleep(2)
+            try:
+                await msg.delete()
+            except:
+                pass
+
+        asyncio.create_task(delete_later(message))
+
     text = message.text
+    if not text:
+        return
     if not text:
         return
 
