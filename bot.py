@@ -14,7 +14,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 GROUP_ID = os.getenv("GROUP_ID")
 DATABASE_URL = os.getenv("DATABASE_URL")
-ADMIN_USERNAME = "muhibillaevich"
+ADMIN_IDS = [6042457335]
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
