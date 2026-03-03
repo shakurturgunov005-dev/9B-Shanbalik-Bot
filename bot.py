@@ -171,39 +171,34 @@ async def handle_message(message: types.Message):
 
         remaining = (student["shanbalik_date"] - datetime.date.today()).days
 
-        return await message.answer(
-            f"{student['name']}\n"
-            f"{format_date_uz(student['shanbalik_date'])}\n"
-            f"Qolgan kun: {remaining}"
-        )
+        msg = f"━━━━━━━━━━━━━━━━━━\n"
+        msg += f"📅 <b>NAVBAT</b>\n"
+        msg += f"━━━━━━━━━━━━━━━━━━\n\n"
+        msg += f"👤 <b>{student['name']}</b>\n"
+        msg += f"🗓 {format_date_uz(student['shanbalik_date'])}\n"
+        msg += f"⏳ Qolgan kun: {remaining}\n"
+        msg += f"\n━━━━━━━━━━━━━━━━━━"
 
-    # RO'YXAT (guruh va private oddiy)
+        return await message.answer(msg, parse_mode="HTML")
+
+    # RO'YXAT PREMIUM
     if text == "📋 Ro‘yxat" or text == "/list":
-    students = await get_all_students()
-    if not students:
-        return await message.answer("Ro‘yxat bo‘sh.")
-
-    msg = "━━━━━━━━━━━━━━━━━━\n"
-    msg += "📚 <b>SHANBALIK RO‘YXATI</b>\n"
-    msg += "━━━━━━━━━━━━━━━━━━\n\n"
-
-    for i, s in enumerate(students, start=1):
-        msg += f"{i}️⃣ <b>{s['name']}</b>\n"
-        msg += f"🗓 {format_date_uz(s['shanbalik_date'])}\n\n"
-
-    msg += "━━━━━━━━━━━━━━━━━━\n"
-    msg += f"Jami: {len(students)} ta o‘quvchi"
-
-    await message.answer(msg, parse_mode="HTML")
         students = await get_all_students()
         if not students:
             return await message.answer("Ro‘yxat bo‘sh.")
 
-        msg = "\n".join(
-            f"{s['name']} - {format_date_uz(s['shanbalik_date'])}"
-            for s in students
-        )
-        return await message.answer(msg)
+        msg = "━━━━━━━━━━━━━━━━━━\n"
+        msg += "📚 <b>SHANBALIK RO‘YXATI</b>\n"
+        msg += "━━━━━━━━━━━━━━━━━━\n\n"
+
+        for i, s in enumerate(students, start=1):
+            msg += f"{i}️⃣ <b>{s['name']}</b>\n"
+            msg += f"🗓 {format_date_uz(s['shanbalik_date'])}\n\n"
+
+        msg += "━━━━━━━━━━━━━━━━━━\n"
+        msg += f"Jami: {len(students)} ta o‘quvchi"
+
+        return await message.answer(msg, parse_mode="HTML")
 
     # TARIX
     if text == "📚 Tarix" or text == "/history":
@@ -218,25 +213,34 @@ async def handle_message(message: types.Message):
         if not rows:
             return await message.answer("Tarix bo‘sh.")
 
-        msg = "\n".join(
-            f"{r['name']} - {format_date_uz(r['shanbalik_date'])}"
-            for r in rows
-        )
-        return await message.answer(msg)
+        msg = "━━━━━━━━━━━━━━━━━━\n"
+        msg += "📚 <b>OXIRGI 10 TA TARIX</b>\n"
+        msg += "━━━━━━━━━━━━━━━━━━\n\n"
 
-    # ADMIN – QO‘SHISH
+        for r in rows:
+            msg += f"👤 <b>{r['name']}</b>\n"
+            msg += f"🗓 {format_date_uz(r['shanbalik_date'])}\n\n"
+
+        msg += "━━━━━━━━━━━━━━━━━━"
+
+        return await message.answer(msg, parse_mode="HTML")
+
+    # ADMIN QO‘SHISH
     if text == "➕ O‘quvchi qo‘shish":
         if not is_admin(message) or message.chat.type != "private":
             return await message.answer("Ruxsat yo‘q ❌")
 
-        return await message.answer("Ism va sanani yuboring:\nMasalan: Ali, 2026-09-01")
+        return await message.answer(
+            "Ism va sanani yuboring:\nMasalan:\nAli, 2026-09-01"
+        )
 
-    # ADMIN – O‘CHIRISH PANEL
+    # ADMIN O‘CHIRISH
     if text == "❌ O‘quvchi o‘chirish":
         if not is_admin(message) or message.chat.type != "private":
             return await message.answer("Ruxsat yo‘q ❌")
 
         students = await get_all_students()
+
         for s in students:
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
@@ -249,6 +253,21 @@ async def handle_message(message: types.Message):
                 f"{s['name']} - {format_date_uz(s['shanbalik_date'])}",
                 reply_markup=keyboard
             )
+
+    # ADMIN REAL ADD
+    if message.chat.type == "private" and is_admin(message):
+        if "," in text:
+            try:
+                name, date_str = text.split(",")
+                date_obj = datetime.datetime.strptime(
+                    date_str.strip(),
+                    "%Y-%m-%d"
+                ).date()
+
+                await add_student(name.strip(), date_obj)
+                return await message.answer("Qo‘shildi ✅")
+            except:
+                return await message.answer("Format noto‘g‘ri ❌")
 
 # ================= CALLBACK =================
 
@@ -263,10 +282,8 @@ async def handle_callback(callback: types.CallbackQuery):
         await callback.answer("Faqat private chatda ❌", show_alert=True)
         return
 
-    data = callback.data
-
-    if data.startswith("delete_"):
-        student_id = int(data.split("_")[1])
+    if callback.data.startswith("delete_"):
+        student_id = int(callback.data.split("_")[1])
         await delete_student_by_id(student_id)
         await callback.message.edit_text("O‘chirildi ✅")
         await callback.answer()
