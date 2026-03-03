@@ -179,6 +179,22 @@ async def handle_message(message: types.Message):
 
     # RO'YXAT (guruh va private oddiy)
     if text == "📋 Ro‘yxat" or text == "/list":
+    students = await get_all_students()
+    if not students:
+        return await message.answer("Ro‘yxat bo‘sh.")
+
+    msg = "━━━━━━━━━━━━━━━━━━\n"
+    msg += "📚 <b>SHANBALIK RO‘YXATI</b>\n"
+    msg += "━━━━━━━━━━━━━━━━━━\n\n"
+
+    for i, s in enumerate(students, start=1):
+        msg += f"{i}️⃣ <b>{s['name']}</b>\n"
+        msg += f"🗓 {format_date_uz(s['shanbalik_date'])}\n\n"
+
+    msg += "━━━━━━━━━━━━━━━━━━\n"
+    msg += f"Jami: {len(students)} ta o‘quvchi"
+
+    await message.answer(msg, parse_mode="HTML")
         students = await get_all_students()
         if not students:
             return await message.answer("Ro‘yxat bo‘sh.")
