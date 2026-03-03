@@ -58,6 +58,20 @@ async def get_user_count():
     async with db_pool.acquire() as conn:
         return await conn.fetchval("SELECT COUNT(*) FROM users")
 
+async def get_today_users():
+    async with db_pool.acquire() as conn:
+        return await conn.fetchval("""
+            SELECT COUNT(*) FROM users
+            WHERE DATE(joined_at) = CURRENT_DATE
+        """)
+
+async def get_last_7_days_users():
+    async with db_pool.acquire() as conn:
+        return await conn.fetchval("""
+            SELECT COUNT(*) FROM users
+            WHERE joined_at >= CURRENT_DATE - INTERVAL '7 days'
+        """)
+
 async def get_all_users():
     async with db_pool.acquire() as conn:
         return await conn.fetch("SELECT user_id FROM users")
@@ -121,20 +135,33 @@ async def handle_message(message: types.Message):
         if not text:
             return
 
-        # ===== ADMIN PANEL =====
+        # ===== PRO ADMIN DASHBOARD =====
         if text == "/admin":
             if not is_admin(message):
                 return await message.answer("Admin emas.")
-            count = await get_user_count()
+
+            total = await get_user_count()
+            today = await get_today_users()
+            last7 = await get_last_7_days_users()
+            next_student = await get_next_student()
+
+            if next_student:
+                days_left = (next_student["shanbalik_date"] - datetime.date.today()).days
+                navbat_info = f"{next_student['name']} ({days_left} kun qoldi)"
+            else:
+                navbat_info = "Navbat topilmadi"
+
             return await message.answer(
-                f"🔐 Admin panel\n👥 Foydalanuvchilar: {count}"
+                f"🔐 SINF BOSHQARUV PANELI\n\n"
+                f"👥 Umumiy foydalanuvchilar: {total}\n"
+                f"📅 Bugungi qo‘shilganlar: {today}\n"
+                f"📈 Oxirgi 7 kun: {last7}\n"
+                f"🗓 Navbatdagi shanbalik: {navbat_info}"
             )
 
-        # ===== START =====
         if text == "/start":
             return await message.answer("Bot 24/7 ishlayapti 🚀")
 
-        # ===== BROADCAST =====
         if text.startswith("/broadcast"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
@@ -150,7 +177,6 @@ async def handle_message(message: types.Message):
 
             return await message.answer("Xabar yuborildi ✅")
 
-        # ===== LIST =====
         if text == "/list":
             students = await get_all_students()
             if not students:
@@ -162,7 +188,6 @@ async def handle_message(message: types.Message):
             )
             return await message.answer(msg)
 
-        # ===== NAVBAT =====
         if text == "/navbat":
             student = await get_next_student()
             if not student:
@@ -176,7 +201,6 @@ async def handle_message(message: types.Message):
                 f"Qolgan kun: {remaining}"
             )
 
-        # ===== ADD =====
         if text.startswith("/add"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
@@ -206,7 +230,6 @@ async def handle_message(message: types.Message):
             except:
                 return await message.answer("Format: /add Ali 1 mart 2026")
 
-        # ===== DELETE =====
         if text.startswith("/delete"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
