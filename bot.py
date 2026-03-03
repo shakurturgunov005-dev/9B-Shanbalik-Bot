@@ -41,7 +41,7 @@ def format_date_uz(date_obj):
 
 # ================= KEYBOARDS =================
 
-def main_keyboard():
+def group_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📅 Navbat")],
@@ -51,7 +51,8 @@ def main_keyboard():
         resize_keyboard=True
     )
 
-def admin_keyboard():
+
+def admin_private_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📅 Navbat")],
