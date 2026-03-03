@@ -163,9 +163,27 @@ async def handle_message(message: types.Message):
 
     # START
     if text == "/start":
+
+    # Agar guruh bo‘lsa
+    if message.chat.type in ["group", "supergroup"]:
+        return await message.answer(
+            "Sinf menyusi 📚",
+            reply_markup=group_keyboard()
+        )
+
+    # Agar private chat bo‘lsa
+    if message.chat.type == "private":
+
         if is_admin(message):
-            return await message.answer("Admin menyu 🔐", reply_markup=admin_keyboard())
-        return await message.answer("Xush kelibsiz 👋", reply_markup=main_keyboard())
+            return await message.answer(
+                "Admin panel 🔐",
+                reply_markup=admin_private_keyboard()
+            )
+        else:
+            return await message.answer(
+                "Sinf menyusi 📚",
+                reply_markup=group_keyboard()
+            )
 
     # NAVBAT
     if text == "📅 Navbat" or text == "/navbat":
