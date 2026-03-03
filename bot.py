@@ -188,7 +188,7 @@ async def handle_message(message: types.Message):
             return await message.answer("Ro‘yxat bo‘sh.")
 
         msg = "━━━━━━━━━━━━━━━━━━\n"
-        msg += "📚 <b>SHANBALIK RO‘YXATI</b>\n"
+        msg += "📚 <b>SHANBALIK RO‘YXATI 2026</b>\n"
         msg += "━━━━━━━━━━━━━━━━━━\n\n"
 
         for i, s in enumerate(students, start=1):
