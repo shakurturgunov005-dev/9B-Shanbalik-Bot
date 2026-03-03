@@ -110,10 +110,10 @@ async def handle_message(message: types.Message):
             return await message.answer("Bot 24/7 ishlayapti 🚀")
 
         if text == "/admin":
-            if text == "/admin":
-                return await message.answer(f"Sizning ID: {message.from_user.id}")
-            count = await get_user_count()
-            return await message.answer(f"👥 Foydalanuvchilar: {count}")
+            if not is_admin(message):
+                return await message.answer("Admin emas.")
+                count = await get_user_count()
+                return await message.answer(f"👥 Foydalanuvchilar soni: {count}")
 
         if text.startswith("/broadcast"):
             if not is_admin(message):
