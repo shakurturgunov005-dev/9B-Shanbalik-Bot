@@ -112,9 +112,8 @@ async def handle_message(message: types.Message):
         if text == "/admin":
             if not is_admin(message):
                 return await message.answer("Admin emas.")
-                count = await get_user_count()
-                return await message.answer(f"👥 Foydalanuvchilar soni: {count}")
-
+                return await message.answer("Admin panel ishlayapti ✅")
+                
         if text.startswith("/broadcast"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
