@@ -98,6 +98,18 @@ async def delete_student_by_name(name):
 def is_admin(message: types.Message):
     return message.from_user.id in ADMIN_IDS
 
+# ================= ERROR MONITORING =================
+
+async def notify_admin_error(error_text: str):
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(
+                admin_id,
+                f"🚨 BOT XATOLIK!\n\n{error_text}"
+            )
+        except:
+            pass
+
 # ================= COMMANDS =================
 
 @dp.message()
@@ -109,7 +121,7 @@ async def handle_message(message: types.Message):
         if not text:
             return
 
-        # ===== ADMIN =====
+        # ===== ADMIN PANEL =====
         if text == "/admin":
             if not is_admin(message):
                 return await message.answer("Admin emas.")
@@ -192,9 +204,7 @@ async def handle_message(message: types.Message):
                 return await message.answer("Qo‘shildi ✅")
 
             except:
-                return await message.answer(
-                    "Format: /add Ali 1 mart 2026"
-                )
+                return await message.answer("Format: /add Ali 1 mart 2026")
 
         # ===== DELETE =====
         if text.startswith("/delete"):
@@ -212,31 +222,40 @@ async def handle_message(message: types.Message):
                 return await message.answer("O‘chirildi ✅")
 
             except:
-                return await message.answer(
-                    "Format: /delete ID yoki Ism"
-                )
+                return await message.answer("Format: /delete ID yoki Ism")
 
     except Exception as e:
-        print("ERROR:", e)
+        error_text = f"{type(e).__name__}: {e}"
+        print("ERROR:", error_text)
+        await notify_admin_error(error_text)
 
 # ================= REMINDER =================
 
 async def monthly_reminder():
-    student = await get_next_student()
-    if student and GROUP_ID:
-        await bot.send_message(
-            chat_id=int(GROUP_ID),
-            text=f"📢 28-kun eslatma:\n{student['name']} - {student['shanbalik_date']}"
-        )
+    try:
+        student = await get_next_student()
+        if student and GROUP_ID:
+            await bot.send_message(
+                chat_id=int(GROUP_ID),
+                text=f"📢 28-kun eslatma:\n{student['name']} - {student['shanbalik_date']}"
+            )
+    except Exception as e:
+        await notify_admin_error(f"REMINDER ERROR: {e}")
 
 # ================= WEBHOOK =================
 
 @app.post("/webhook")
 async def webhook_handler(request: Request):
-    data = await request.json()
-    update = Update.model_validate(data)
-    await dp.feed_update(bot, update)
-    return JSONResponse({"ok": True})
+    try:
+        data = await request.json()
+        update = Update.model_validate(data)
+        await dp.feed_update(bot, update)
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        error_text = f"WEBHOOK ERROR: {type(e).__name__}: {e}"
+        print(error_text)
+        await notify_admin_error(error_text)
+        return JSONResponse({"ok": False})
 
 @app.on_event("startup")
 async def on_startup():
