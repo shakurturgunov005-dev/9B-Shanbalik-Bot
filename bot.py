@@ -14,6 +14,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 GROUP_ID = os.getenv("GROUP_ID")
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 ADMIN_IDS = [6042457335]
 
 bot = Bot(token=BOT_TOKEN)
@@ -102,51 +103,72 @@ def is_admin(message: types.Message):
 @dp.message()
 async def handle_message(message: types.Message):
     try:
-        print("USER ID:", message.from_user.id)
         await add_user(message.from_user)
         text = message.text
 
-        if text == "/start":
-            return await message.answer("Bot 24/7 ishlayapti 🚀")
+        if not text:
+            return
 
+        # ===== ADMIN =====
         if text == "/admin":
             if not is_admin(message):
                 return await message.answer("Admin emas.")
-                return await message.answer("Admin panel ishlayapti ✅")
-                
+            count = await get_user_count()
+            return await message.answer(
+                f"🔐 Admin panel\n👥 Foydalanuvchilar: {count}"
+            )
+
+        # ===== START =====
+        if text == "/start":
+            return await message.answer("Bot 24/7 ishlayapti 🚀")
+
+        # ===== BROADCAST =====
         if text.startswith("/broadcast"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
+
             msg = text.replace("/broadcast ", "")
             users = await get_all_users()
+
             for u in users:
                 try:
                     await bot.send_message(u["user_id"], msg)
                 except:
                     pass
-            return await message.answer("Yuborildi.")
 
+            return await message.answer("Xabar yuborildi ✅")
+
+        # ===== LIST =====
         if text == "/list":
             students = await get_all_students()
             if not students:
                 return await message.answer("Ro‘yxat bo‘sh.")
-            msg = ""
-            for s in students:
-                msg += f"{s['id']}. {s['name']} - {s['shanbalik_date']}\n"
+
+            msg = "\n".join(
+                f"{s['id']}. {s['name']} - {s['shanbalik_date']}"
+                for s in students
+            )
             return await message.answer(msg)
 
+        # ===== NAVBAT =====
         if text == "/navbat":
             student = await get_next_student()
             if not student:
                 return await message.answer("Navbat topilmadi.")
+
             remaining = (student["shanbalik_date"] - datetime.date.today()).days
+
             return await message.answer(
-                f"{student['name']}\nSana: {student['shanbalik_date']}\nQolgan kun: {remaining}"
+                f"{student['name']}\n"
+                f"Sana: {student['shanbalik_date']}\n"
+                f"Qolgan kun: {remaining}"
             )
 
+        # ===== ADD =====
         if text.startswith("/add"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
+
             try:
                 parts = text.split()
                 name = parts[1]
@@ -161,24 +183,38 @@ async def handle_message(message: types.Message):
                 }
 
                 month = months.get(month_text)
+                if not month:
+                    return await message.answer("Oy noto‘g‘ri yozilgan.")
+
                 date = datetime.date(year, month, day)
                 await add_student(name, date)
-                return await message.answer("Qo‘shildi.")
-            except:
-                return await message.answer("Format: /add Ali 1 mart 2026")
 
+                return await message.answer("Qo‘shildi ✅")
+
+            except:
+                return await message.answer(
+                    "Format: /add Ali 1 mart 2026"
+                )
+
+        # ===== DELETE =====
         if text.startswith("/delete"):
             if not is_admin(message):
                 return await message.answer("Admin emas.")
+
             try:
                 value = text.split()[1]
+
                 if value.isdigit():
                     await delete_student_by_id(int(value))
                 else:
                     await delete_student_by_name(value)
-                return await message.answer("O‘chirildi.")
+
+                return await message.answer("O‘chirildi ✅")
+
             except:
-                return await message.answer("Format: /delete ID yoki Ism")
+                return await message.answer(
+                    "Format: /delete ID yoki Ism"
+                )
 
     except Exception as e:
         print("ERROR:", e)
@@ -189,7 +225,7 @@ async def monthly_reminder():
     student = await get_next_student()
     if student and GROUP_ID:
         await bot.send_message(
-            chat_id=GROUP_ID,
+            chat_id=int(GROUP_ID),
             text=f"📢 28-kun eslatma:\n{student['name']} - {student['shanbalik_date']}"
         )
 
@@ -207,8 +243,10 @@ async def on_startup():
     global db_pool
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
+
     scheduler.add_job(monthly_reminder, "cron", day=28, hour=8, minute=0)
     scheduler.start()
+
     await bot.set_webhook(WEBHOOK_URL)
 
 # ================= RUN =================
