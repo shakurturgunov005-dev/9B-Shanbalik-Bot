@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
 
@@ -316,7 +317,8 @@ async def startup():
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    await dp.feed_raw_update(bot, data)
+    update = Update.model_validate(data)
+    await dp.feed_update(bot, update)
     return JSONResponse({"ok": True})
 
 # ================= RUN =================
