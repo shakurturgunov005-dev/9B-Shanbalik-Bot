@@ -2,24 +2,14 @@ import asyncio
 import os
 import datetime
 import asyncpg
+import pytz
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import (
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.types import Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
-import pytz
-print("FILE STARTED")
-print("BOT_TOKEN:", os.getenv("BOT_TOKEN"))
-print("WEBHOOK_URL:", os.getenv("WEBHOOK_URL"))
-print("GROUP_ID:", os.getenv("GROUP_ID"))
-print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 
 # ================= CONFIG =================
 
@@ -85,7 +75,7 @@ async def init_db():
 
 # ================= ABOUT =================
 
-@dp.message(lambda m: m.text == "/about")
+@dp.message(F.text == "/about")
 async def about_handler(message: types.Message):
     msg = (
         "━━━━━━━━━━━━━━━━━━\n"
@@ -101,11 +91,33 @@ async def about_handler(message: types.Message):
     sent = await message.answer(msg, parse_mode="HTML")
     asyncio.create_task(auto_delete(sent, 60))
 
-# ================= BIRTHDAY ADD =================
+# ================= MAIN BUTTONS =================
 
-@dp.message(lambda m: m.chat.type == "private")
+@dp.message(F.text.contains("Navbat"))
+async def navbat_handler(message: types.Message):
+    await message.answer("📅 Navbat bo‘limi ishladi!")
+
+@dp.message(F.text.contains("Ro’yxat"))
+async def royxat_handler(message: types.Message):
+    await message.answer("📋 Ro‘yxat bo‘limi ishladi!")
+
+@dp.message(F.text.contains("Tarix"))
+async def tarix_handler(message: types.Message):
+    await message.answer("📚 Tarix bo‘limi ishladi!")
+
+@dp.message(F.text.contains("qo‘shish"))
+async def add_student_handler(message: types.Message):
+    await message.answer("➕ O‘quvchi qo‘shish ishladi!")
+
+@dp.message(F.text.contains("o‘chirish"))
+async def delete_student_handler(message: types.Message):
+    await message.answer("❌ O‘quvchi o‘chirish ishladi!")
+
+# ================= BIRTHDAY ADD (PRIVATE ONLY) =================
+
+@dp.message(F.chat.type == "private")
 async def birthday_add(message: types.Message):
-    if "tug‘ilgan" in message.text.lower():
+    if message.text and "tug‘ilgan" in message.text.lower():
         try:
             date_str = message.text.split()[-1]
             birth_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -192,6 +204,8 @@ async def webhook_handler(request: Request):
     update = Update.model_validate(data)
     await dp.feed_update(bot, update)
     return JSONResponse({"ok": True})
+
+# ================= RUN =================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
