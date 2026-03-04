@@ -71,6 +71,22 @@ async def start_handler(message: types.Message):
         reply_markup=main_keyboard
     )
 
+# ================== ABOUT ==================
+
+@dp.message(F.text == "/about")
+async def about_handler(message: types.Message):
+    msg = (
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🚀 <b>ShanbalikPro</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "📦 Version: 2.0\n"
+        "📅 Project Started: 3 March 2026\n"
+        "⚙️ Powered by FastAPI + Aiogram\n\n"
+        "Mini-startup edition 🔥\n"
+        "━━━━━━━━━━━━━━━━━━"
+    )
+    await message.answer(msg, parse_mode="HTML")
+
 # ================== NAVBAT ==================
 
 @dp.message(F.text.contains("Navbat"))
