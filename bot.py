@@ -7,8 +7,7 @@ import pytz
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.types import Update
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
 
@@ -69,7 +68,7 @@ async def init_db():
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS birthdays (
             id SERIAL PRIMARY KEY,
-            user_id BIGINT,
+            user_id BIGINT UNIQUE,
             name TEXT,
             birth_date DATE
         )
@@ -90,9 +89,7 @@ def admin_keyboard():
 
 def user_keyboard():
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📊 Navbat")]
-        ],
+        keyboard=[[KeyboardButton(text="📊 Navbat")]],
         resize_keyboard=True
     )
 
@@ -131,7 +128,7 @@ async def rotate_students():
             datetime.date.today()
         )
 
-# ================= START / COMMANDS =================
+# ================= COMMANDS =================
 
 @dp.message(F.text.startswith("/"))
 async def commands(message: types.Message):
@@ -144,7 +141,6 @@ async def commands(message: types.Message):
         text = f"""
 ━━━━━━━━━━━━━━━━━━
 𝐒𝐇𝐀𝐍𝐁𝐀𝐋𝐈𝐊 𝐏𝐑𝐎
-School Automation System
 ━━━━━━━━━━━━━━━━━━
 
 Assalomu alaykum, {name} 👋
@@ -230,68 +226,36 @@ async def ask_student(message: types.Message):
         return
     await message.answer("Ismini yuboring (private tavsiya qilinadi):")
 
-@dp.message()
-async def catch_text(message: types.Message):
+@dp.message(F.chat.type == "private")
+async def catch_private(message: types.Message):
 
-    # 🎂 Birthday private format: YYYY-MM-DD
-    if message.chat.type == "private":
-        try:
-            birth_date = datetime.datetime.strptime(message.text, "%Y-%m-%d").date()
-            async with db_pool.acquire() as conn:
-                await conn.execute("""
-                    INSERT INTO birthdays (user_id,name,birth_date)
-                    VALUES ($1,$2,$3)
-                    ON CONFLICT DO NOTHING
-                """,
-                message.from_user.id,
-                message.from_user.full_name,
-                birth_date)
-            await message.answer("🎂 Tug‘ilgan kun saqlandi!")
-            return
-        except:
-            pass
+    # Birthday format
+    try:
+        birth_date = datetime.datetime.strptime(message.text, "%Y-%m-%d").date()
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO birthdays (user_id,name,birth_date)
+                VALUES ($1,$2,$3)
+                ON CONFLICT (user_id) DO NOTHING
+            """,
+            message.from_user.id,
+            message.from_user.full_name,
+            birth_date)
+        await message.answer("🎂 Tug‘ilgan kun saqlandi!")
+        return
+    except:
+        pass
 
-    # Add student (admin)
+    # Add student (admin only)
     if message.from_user.id in ADMIN_IDS:
         async with db_pool.acquire() as conn:
             count = await conn.fetchval("SELECT COUNT(*) FROM students")
             await conn.execute(
-                "INSERT INTO students (name, position) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+                "INSERT INTO students (name, position) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING",
                 message.text,
                 count + 1
             )
         await message.answer("✅ Qo‘shildi")
-
-# ================= REMINDERS =================
-
-async def first_day_reminder():
-    student = await get_current_student()
-    if student:
-        await bot.send_message(GROUP_ID, f"📢 Bugun shanbalik: {student['name']}")
-
-async def rotation_job():
-    await rotate_students()
-    await bot.send_message(GROUP_ID, "🔄 Navbat avtomatik aylantirildi.")
-
-async def reminder_28():
-    student = await get_current_student()
-    if student:
-        await bot.send_message(GROUP_ID, f"⏰ 3 kundan keyin shanbalik: {student['name']}")
-
-async def birthday_reminder():
-    today = datetime.date.today()
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT name FROM birthdays
-            WHERE EXTRACT(MONTH FROM birth_date) = $1
-            AND EXTRACT(DAY FROM birth_date) = $2
-        """, today.month, today.day)
-
-    for r in rows:
-        await bot.send_message(
-            GROUP_ID,
-            f"🎉 Bugun {r['name']} ning tug‘ilgan kuni!"
-        )
 
 # ================= STARTUP =================
 
@@ -301,11 +265,6 @@ async def startup():
 
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
-
-    scheduler.add_job(first_day_reminder, "cron", day=1, hour=6, minute=0)
-    scheduler.add_job(rotation_job, "cron", day=1, hour=22, minute=0)
-    scheduler.add_job(reminder_28, "cron", day=28, hour=6, minute=0)
-    scheduler.add_job(birthday_reminder, "cron", hour=6, minute=5)
 
     scheduler.start()
 
@@ -317,15 +276,12 @@ async def startup():
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    print("INCOMING UPDATE:", data)
-
     try:
         update = Update.model_validate(data)
         await dp.feed_update(bot, update)
         return JSONResponse({"ok": True})
     except Exception as e:
         import traceback
-        print("ERROR OCCURRED:")
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
 
