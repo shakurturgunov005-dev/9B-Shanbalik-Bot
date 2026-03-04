@@ -317,9 +317,17 @@ async def startup():
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    update = Update.model_validate(data)
-    await dp.feed_update(bot, update)
-    return JSONResponse({"ok": True})
+    print("INCOMING UPDATE:", data)
+
+    try:
+        update = Update.model_validate(data)
+        await dp.feed_update(bot, update)
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        import traceback
+        print("ERROR OCCURRED:")
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 # ================= RUN =================
 
