@@ -272,9 +272,9 @@ async def catch_private(message: types.Message):
     except:
         pass
 
-    # 👤 Add student (admin only)
+    # Add student (admin only)
     if message.from_user.id in ADMIN_IDS:
-    async with db_pool.acquire() as conn:
+        async with db_pool.acquire() as conn:
         count = await conn.fetchval("SELECT COUNT(*) FROM students")
 
         next_date = next_first_day()
@@ -289,7 +289,6 @@ async def catch_private(message: types.Message):
         )
 
     await message.answer("✅ Qo‘shildi")
-
 # ================= STARTUP =================
 
 @app.on_event("startup")
