@@ -67,13 +67,13 @@ async def init_db():
         """)
 
         await conn.execute("""
-        CREATE TABLE IF NOT EXISTS birthdays (
-            id SERIAL PRIMARY KEY,
-            user_id BIGINT UNIQUE,
-            name TEXT,
-            birth_date DATE
-        )
-        """)
+CREATE TABLE IF NOT EXISTS history (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    shanbalik_date DATE NOT NULL,
+    completed_at TIMESTAMP DEFAULT NOW()
+)
+""")
 
 # ================= KEYBOARDS =================
 
@@ -96,6 +96,21 @@ def user_keyboard():
 
 # ================= UTIL =================
 
+async def move_past_students_to_history():
+    async with db_pool.acquire() as conn:
+        # historyga ko‘chirish
+        await conn.execute("""
+            INSERT INTO history (name, shanbalik_date)
+            SELECT name, shanbalik_date
+            FROM students
+            WHERE shanbalik_date < CURRENT_DATE
+        """)
+
+        # studentsdan o‘chirish
+        await conn.execute("""
+            DELETE FROM students
+            WHERE shanbalik_date < CURRENT_DATE
+        """)
 def next_first_day():
     today = datetime.datetime.now(UZ_TZ)
     if today.month == 12:
@@ -104,30 +119,24 @@ def next_first_day():
 
 async def get_current_student():
     async with db_pool.acquire() as conn:
-        return await conn.fetchrow(
-            "SELECT * FROM students ORDER BY position LIMIT 1"
-        )
 
-async def rotate_students():
-    async with db_pool.acquire() as conn:
-        students = await conn.fetch("SELECT * FROM students ORDER BY position")
-        if len(students) < 2:
-            return
+        student = await conn.fetchrow("""
+            SELECT *
+            FROM students
+            WHERE shanbalik_date >= CURRENT_DATE
+            ORDER BY shanbalik_date ASC
+            LIMIT 1
+        """)
 
-        first = students[0]
+        if not student:
+            student = await conn.fetchrow("""
+                SELECT *
+                FROM students
+                ORDER BY shanbalik_date ASC
+                LIMIT 1
+            """)
 
-        await conn.execute("UPDATE students SET position = position - 1")
-        await conn.execute(
-            "UPDATE students SET position = $1 WHERE id = $2",
-            len(students),
-            first["id"]
-        )
-
-        await conn.execute(
-            "INSERT INTO history (name, month) VALUES ($1,$2)",
-            first["name"],
-            datetime.date.today()
-        )
+        return student
 
 # ================= COMMANDS =================
 
@@ -140,7 +149,7 @@ async def start_handler(message: types.Message):
 
     text = f"""
 ━━━━━━━━━━━━━━━━━━
-𝐒𝐇𝐀𝐍𝐁𝐀𝐋𝐈𝐊 𝐏𝐑𝐎
+📊 𝐒𝐇𝐀𝐍𝐁𝐀𝐋𝐈𝐊 𝟐𝟎𝟐𝟔
 ━━━━━━━━━━━━━━━━━━
 
 Assalomu alaykum, {name} 👋
@@ -158,9 +167,13 @@ System Status: 🟢 Active
 
 @dp.message(F.text == "📊 Navbat")
 async def navbat(message: types.Message):
+
+    await move_past_students_to_history()
+
     student = await get_current_student()
+
     if not student:
-        await smart_send(message, "Ro‘yxat bo‘sh.", 180)
+        await smart_send(message, "Ro’yxat bo’sh.", 180)
         return
 
     next_date = next_first_day()
@@ -168,7 +181,7 @@ async def navbat(message: types.Message):
 
     text = f"""
 ━━━━━━━━━━━━━━━━━━
-📊 NAVBAT
+📊 𝐍𝐀𝐕𝐁𝐀𝐓
 ━━━━━━━━━━━━━━━━━━
 
 👤 {student['name']}
