@@ -226,7 +226,15 @@ async def ask_student(message: types.Message):
         return
     await message.answer("Ismini yuboring (private tavsiya qilinadi):")
 
-@dp.message(F.chat.type == "private")
+@dp.message(
+    F.chat.type == "private",
+    ~F.text.in_([
+        "📊 Navbat",
+        "📋 Ro‘yxat",
+        "📜 Tarix",
+        "➕ O‘quvchi qo‘shish"
+    ])
+)
 async def catch_private(message: types.Message):
 
     # Birthday format
