@@ -10,6 +10,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
+from aiogram.filters import CommandStart
 
 # ================= CONFIG =================
 
@@ -130,15 +131,14 @@ async def rotate_students():
 
 # ================= COMMANDS =================
 
-@dp.message(F.text.startswith("/"))
-async def commands(message: types.Message):
+@dp.message(CommandStart())
+async def start_handler(message: types.Message):
 
-    if message.text == "/start":
-        name = message.from_user.full_name
-        is_admin = message.from_user.id in ADMIN_IDS
-        role = "ADMIN 👑" if is_admin else "USER"
+    name = message.from_user.full_name
+    is_admin = message.from_user.id in ADMIN_IDS
+    role = "ADMIN 👑" if is_admin else "USER"
 
-        text = f"""
+    text = f"""
 ━━━━━━━━━━━━━━━━━━
 𝐒𝐇𝐀𝐍𝐁𝐀𝐋𝐈𝐊 𝐏𝐑𝐎
 ━━━━━━━━━━━━━━━━━━
@@ -148,14 +148,12 @@ Access Level: {role}
 System Status: 🟢 Active
 ━━━━━━━━━━━━━━━━━━
 """
-        await message.answer(
-            text,
-            reply_markup=admin_keyboard() if is_admin else user_keyboard()
-        )
 
-    if message.chat.type in ["group", "supergroup"]:
-        asyncio.create_task(auto_delete(message, 180))
-
+    await message.answer(
+        text,
+        reply_markup=admin_keyboard() if is_admin else user_keyboard()
+    )
+    
 # ================= NAVBAT =================
 
 @dp.message(F.text == "📊 Navbat")
@@ -226,8 +224,12 @@ async def ask_student(message: types.Message):
         return
     await message.answer("Ismini yuboring (private tavsiya qilinadi):")
 
+# ================= catch_private =================
+
 @dp.message(
     F.chat.type == "private",
+    F.text,
+    ~F.text.startswith("/"),
     ~F.text.in_([
         "📊 Navbat",
         "📋 Ro‘yxat",
