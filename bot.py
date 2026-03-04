@@ -254,7 +254,7 @@ async def ask_student(message: types.Message):
 )
 async def catch_private(message: types.Message):
 
-    # Birthday format
+    # 🎂 Birthday format
     try:
         birth_date = datetime.datetime.strptime(message.text, "%Y-%m-%d").date()
         async with db_pool.acquire() as conn:
@@ -266,28 +266,29 @@ async def catch_private(message: types.Message):
             message.from_user.id,
             message.from_user.full_name,
             birth_date)
+
         await message.answer("🎂 Tug‘ilgan kun saqlandi!")
         return
     except:
         pass
 
-    # Add student (admin only)
+    # 👤 Add student (admin only)
     if message.from_user.id in ADMIN_IDS:
+
         async with db_pool.acquire() as conn:
-        count = await conn.fetchval("SELECT COUNT(*) FROM students")
+            count = await conn.fetchval("SELECT COUNT(*) FROM students")
+            next_date = next_first_day()
 
-        next_date = next_first_day()
+            await conn.execute(
+                """INSERT INTO students (name, position, shanbalik_date)
+                   VALUES ($1,$2,$3)
+                   ON CONFLICT (name) DO NOTHING""",
+                message.text,
+                count + 1,
+                next_date
+            )
 
-        await conn.execute(
-            """INSERT INTO students (name, position, shanbalik_date)
-               VALUES ($1,$2,$3)
-               ON CONFLICT (name) DO NOTHING""",
-            message.text,
-            count + 1,
-            next_date
-        )
-
-    await message.answer("✅ Qo‘shildi")
+        await message.answer("✅ Qo‘shildi")
 
 # ================= STARTUP =================
 
