@@ -39,12 +39,14 @@ async def auto_delete(message, seconds):
     except:
         pass
 
+
 async def smart_send(message, text, seconds):
     sent = await message.answer(text)
     if message.chat.type in ["group", "supergroup"]:
         asyncio.create_task(auto_delete(sent, seconds))
         asyncio.create_task(auto_delete(message, seconds))
     return sent
+
 
 # ================= DATABASE =================
 
@@ -68,7 +70,7 @@ async def init_db():
             completed_at TIMESTAMP DEFAULT NOW()
         )
         """)
-        
+
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS birthdays (
             id SERIAL PRIMARY KEY,
@@ -77,6 +79,8 @@ async def init_db():
             birth_date DATE
         )
         """)
+
+
 # ================= KEYBOARDS =================
 
 def admin_keyboard():
@@ -90,17 +94,19 @@ def admin_keyboard():
         resize_keyboard=True
     )
 
+
 def user_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📊 Navbat")]],
         resize_keyboard=True
     )
 
+
 # ================= UTIL =================
 
 async def move_past_students_to_history():
     async with db_pool.acquire() as conn:
-        # historyga ko‘chirish
+
         await conn.execute("""
             INSERT INTO history (name, shanbalik_date)
             SELECT name, shanbalik_date
@@ -108,16 +114,20 @@ async def move_past_students_to_history():
             WHERE shanbalik_date < CURRENT_DATE
         """)
 
-        # studentsdan o‘chirish
         await conn.execute("""
             DELETE FROM students
             WHERE shanbalik_date < CURRENT_DATE
         """)
+
+
 def next_first_day():
     today = datetime.datetime.now(UZ_TZ)
+
     if today.month == 12:
         return datetime.date(today.year + 1, 1, 1)
+
     return datetime.date(today.year, today.month + 1, 1)
+
 
 async def get_current_student():
     async with db_pool.acquire() as conn:
@@ -139,6 +149,7 @@ async def get_current_student():
             """)
 
         return student
+
 
 # ================= COMMANDS =================
 
@@ -164,7 +175,8 @@ System Status: 🟢 Active
         text,
         reply_markup=admin_keyboard() if is_admin else user_keyboard()
     )
-    
+
+
 # ================= NAVBAT =================
 
 @dp.message(F.text == "📊 Navbat")
@@ -191,12 +203,15 @@ async def navbat(message: types.Message):
 ⏳ Qolgan kun: {days_left} kun
 ━━━━━━━━━━━━━━━━━━
 """
+
     await smart_send(message, text, 180)
+
 
 # ================= RO‘YXAT =================
 
 @dp.message(F.text == "📋 Ro‘yxat")
 async def royxat(message: types.Message):
+
     async with db_pool.acquire() as conn:
         rows = await conn.fetch("SELECT name FROM students ORDER BY position")
 
@@ -205,41 +220,51 @@ async def royxat(message: types.Message):
         return
 
     text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
+
     for i, r in enumerate(rows, start=1):
         text += f"{i}. {r['name']}\n"
+
     text += "\n━━━━━━━━━━━━━━━━━━"
 
     await smart_send(message, text, 300)
+
 
 # ================= TARIX =================
 
 @dp.message(F.text == "📜 Tarix")
 async def tarix(message: types.Message):
+
     async with db_pool.acquire() as conn:
         rows = await conn.fetch(
-    "SELECT name, shanbalik_date FROM history ORDER BY id DESC LIMIT 10"
-)
+            "SELECT name, shanbalik_date FROM history ORDER BY id DESC LIMIT 10"
+        )
 
     if not rows:
         await smart_send(message, "Tarix bo‘sh.", 300)
         return
 
     text = "━━━━━━━━━━━━━━━━━━\n📜 TARIX\n━━━━━━━━━━━━━━━━━━\n\n"
+
     for r in rows:
         text += f"{r['name']} — {r['shanbalik_date']}\n"
+
     text += "\n━━━━━━━━━━━━━━━━━━"
 
     await smart_send(message, text, 300)
+
 
 # ================= ADD STUDENT =================
 
 @dp.message(F.text == "➕ O‘quvchi qo‘shish")
 async def ask_student(message: types.Message):
+
     if message.from_user.id not in ADMIN_IDS:
         return
+
     await message.answer("Ismini yuboring (private tavsiya qilinadi):")
 
-# ================= catch_private =================
+
+# ================= PRIVATE HANDLER =================
 
 @dp.message(
     F.chat.type == "private",
@@ -254,9 +279,10 @@ async def ask_student(message: types.Message):
 )
 async def catch_private(message: types.Message):
 
-    # 🎂 Birthday format
+    # 🎂 Birthday
     try:
         birth_date = datetime.datetime.strptime(message.text, "%Y-%m-%d").date()
+
         async with db_pool.acquire() as conn:
             await conn.execute("""
                 INSERT INTO birthdays (user_id,name,birth_date)
@@ -269,30 +295,36 @@ async def catch_private(message: types.Message):
 
         await message.answer("🎂 Tug‘ilgan kun saqlandi!")
         return
+
     except:
         pass
 
-    # Add student (admin only)
+    # ➕ Add student
     if message.from_user.id in ADMIN_IDS:
-    async with db_pool.acquire() as conn:
-        count = await conn.fetchval("SELECT COUNT(*) FROM students")
 
-        next_date = next_first_day()
+        async with db_pool.acquire() as conn:
 
-        await conn.execute(
-            """INSERT INTO students (name, position, shanbalik_date)
-               VALUES ($1,$2,$3)
-               ON CONFLICT (name) DO NOTHING""",
-            message.text,
-            count + 1,
-            next_date
-        )
+            count = await conn.fetchval("SELECT COUNT(*) FROM students")
 
-    await message.answer("✅ Qo‘shildi")
+            next_date = next_first_day()
+
+            await conn.execute(
+                """INSERT INTO students (name, position, shanbalik_date)
+                   VALUES ($1,$2,$3)
+                   ON CONFLICT (name) DO NOTHING""",
+                message.text,
+                count + 1,
+                next_date
+            )
+
+        await message.answer("✅ Qo‘shildi")
+
+
 # ================= STARTUP =================
 
 @app.on_event("startup")
 async def startup():
+
     global db_pool
 
     db_pool = await asyncpg.create_pool(DATABASE_URL)
@@ -303,19 +335,26 @@ async def startup():
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(WEBHOOK_URL)
 
+
 # ================= WEBHOOK =================
 
 @app.post("/webhook")
 async def webhook(request: Request):
+
     data = await request.json()
+
     try:
         update = Update.model_validate(data)
         await dp.feed_update(bot, update)
+
         return JSONResponse({"ok": True})
+
     except Exception as e:
         import traceback
         traceback.print_exc()
+
         return JSONResponse({"error": str(e)}, status_code=500)
+
 
 # ================= RUN =================
 
