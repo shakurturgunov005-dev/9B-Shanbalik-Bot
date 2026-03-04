@@ -297,6 +297,7 @@ async def birthday_reminder():
 @app.on_event("startup")
 async def startup():
     global db_pool
+
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
 
@@ -306,6 +307,8 @@ async def startup():
     scheduler.add_job(birthday_reminder, "cron", hour=6, minute=5)
 
     scheduler.start()
+
+    await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(WEBHOOK_URL)
 
 # ================= WEBHOOK =================
