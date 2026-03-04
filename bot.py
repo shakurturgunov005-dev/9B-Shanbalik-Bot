@@ -175,8 +175,8 @@ async def daily_reminder():
 @app.on_event("startup")
 async def on_startup():
     global db_pool
-    #db_pool = await asyncpg.create_pool(DATABASE_URL)
-    #await init_db()
+    db_pool = await asyncpg.create_pool(DATABASE_URL)
+    await init_db()
 
     scheduler.add_job(daily_reminder, "cron", hour=8, minute=0)
     scheduler.add_job(birthday_reminder, "cron", hour=6, minute=0)
