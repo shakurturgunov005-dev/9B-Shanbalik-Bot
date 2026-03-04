@@ -273,7 +273,7 @@ async def catch_private(message: types.Message):
         pass
 
     # Add student (admin only)
-if message.from_user.id in ADMIN_IDS:
+    if message.from_user.id in ADMIN_IDS:
     async with db_pool.acquire() as conn:
         count = await conn.fetchval("SELECT COUNT(*) FROM students")
 
