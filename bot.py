@@ -68,16 +68,15 @@ async def init_db():
             completed_at TIMESTAMP DEFAULT NOW()
         )
         """)
-
+        
         await conn.execute("""
-CREATE TABLE IF NOT EXISTS history (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    shanbalik_date DATE NOT NULL,
-    completed_at TIMESTAMP DEFAULT NOW()
-)
-""")
-
+        CREATE TABLE IF NOT EXISTS birthdays (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT UNIQUE,
+            name TEXT,
+            birth_date DATE
+        )
+        """)
 # ================= KEYBOARDS =================
 
 def admin_keyboard():
@@ -273,7 +272,7 @@ async def catch_private(message: types.Message):
         pass
 
     # Add student (admin only)
-    if message.from_user.id in ADMIN_IDS:
+if message.from_user.id in ADMIN_IDS:
     async with db_pool.acquire() as conn:
         count = await conn.fetchval("SELECT COUNT(*) FROM students")
 
