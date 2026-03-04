@@ -50,19 +50,22 @@ async def smart_send(message, text, seconds):
 
 async def init_db():
     async with db_pool.acquire() as conn:
+
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS students (
             id SERIAL PRIMARY KEY,
             name TEXT UNIQUE,
-            position INTEGER
+            position INTEGER,
+            shanbalik_date DATE
         )
         """)
 
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id SERIAL PRIMARY KEY,
-            name TEXT,
-            month DATE
+            name TEXT NOT NULL,
+            shanbalik_date DATE NOT NULL,
+            completed_at TIMESTAMP DEFAULT NOW()
         )
         """)
 
@@ -215,8 +218,8 @@ async def royxat(message: types.Message):
 async def tarix(message: types.Message):
     async with db_pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT name, month FROM history ORDER BY id DESC LIMIT 10"
-        )
+    "SELECT name, shanbalik_date FROM history ORDER BY id DESC LIMIT 10"
+)
 
     if not rows:
         await smart_send(message, "Tarix bo‘sh.", 300)
@@ -224,7 +227,7 @@ async def tarix(message: types.Message):
 
     text = "━━━━━━━━━━━━━━━━━━\n📜 TARIX\n━━━━━━━━━━━━━━━━━━\n\n"
     for r in rows:
-        text += f"{r['name']} — {r['month']}\n"
+        text += f"{r['name']} — {r['shanbalik_date']}\n"
     text += "\n━━━━━━━━━━━━━━━━━━"
 
     await smart_send(message, text, 300)
@@ -271,14 +274,21 @@ async def catch_private(message: types.Message):
 
     # Add student (admin only)
     if message.from_user.id in ADMIN_IDS:
-        async with db_pool.acquire() as conn:
-            count = await conn.fetchval("SELECT COUNT(*) FROM students")
-            await conn.execute(
-                "INSERT INTO students (name, position) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING",
-                message.text,
-                count + 1
-            )
-        await message.answer("✅ Qo‘shildi")
+    async with db_pool.acquire() as conn:
+        count = await conn.fetchval("SELECT COUNT(*) FROM students")
+
+        next_date = next_first_day()
+
+        await conn.execute(
+            """INSERT INTO students (name, position, shanbalik_date)
+               VALUES ($1,$2,$3)
+               ON CONFLICT (name) DO NOTHING""",
+            message.text,
+            count + 1,
+            next_date
+        )
+
+    await message.answer("✅ Qo‘shildi")
 
 # ================= STARTUP =================
 
