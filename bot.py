@@ -2,6 +2,11 @@ import asyncio
 import os
 import datetime
 import asyncpg
+print("FILE STARTED")
+print("BOT_TOKEN:", os.getenv("BOT_TOKEN"))
+print("WEBHOOK_URL:", os.getenv("WEBHOOK_URL"))
+print("GROUP_ID:", os.getenv("GROUP_ID"))
+print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types
