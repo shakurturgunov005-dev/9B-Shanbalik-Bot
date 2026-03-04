@@ -1,6 +1,6 @@
-fastapi
-uvicorn
-aiogram
-apscheduler
-asyncpg
-pytz
+aiogram==3.4.1
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+asyncpg==0.29.0
+apscheduler==3.10.4
+pytz==2024.1
