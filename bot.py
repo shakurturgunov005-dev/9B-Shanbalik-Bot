@@ -274,21 +274,21 @@ async def catch_private(message: types.Message):
 
     # 👤 Add student (admin only)
     if message.from_user.id in ADMIN_IDS:
+    async with db_pool.acquire() as conn:
+        count = await conn.fetchval("SELECT COUNT(*) FROM students")
 
-        async with db_pool.acquire() as conn:
-            count = await conn.fetchval("SELECT COUNT(*) FROM students")
-            next_date = next_first_day()
+        next_date = next_first_day()
 
-            await conn.execute(
-                """INSERT INTO students (name, position, shanbalik_date)
-                   VALUES ($1,$2,$3)
-                   ON CONFLICT (name) DO NOTHING""",
-                message.text,
-                count + 1,
-                next_date
-            )
+        await conn.execute(
+            """INSERT INTO students (name, position, shanbalik_date)
+               VALUES ($1,$2,$3)
+               ON CONFLICT (name) DO NOTHING""",
+            message.text,
+            count + 1,
+            next_date
+        )
 
-        await message.answer("✅ Qo‘shildi")
+    await message.answer("✅ Qo‘shildi")
 
 # ================= STARTUP =================
 
