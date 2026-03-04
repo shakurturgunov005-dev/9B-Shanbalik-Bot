@@ -14,6 +14,7 @@ from aiogram.types import (
 )
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
+import pytz
 
 # ================= CONFIG =================
 
@@ -22,50 +23,30 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-ADMIN_IDS = [6042457335]  # O'zingizni ID
+ADMIN_IDS = [6042457335]
+
+UZ_TZ = pytz.timezone("Asia/Tashkent")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI()
-scheduler = AsyncIOScheduler()
+scheduler = AsyncIOScheduler(timezone=UZ_TZ)
 db_pool = None
 
-# ================= DATE FORMAT =================
+# ================= AUTO DELETE =================
 
-def format_date_uz(date_obj):
-    months = {
-        1: "yanvar", 2: "fevral", 3: "mart", 4: "aprel",
-        5: "may", 6: "iyun", 7: "iyul", 8: "avgust",
-        9: "sentyabr", 10: "oktyabr", 11: "noyabr", 12: "dekabr"
-    }
-    return f"{date_obj.day}-{months[date_obj.month]} {date_obj.year}"
+async def auto_delete(message, seconds):
+    await asyncio.sleep(seconds)
+    try:
+        await message.delete()
+    except:
+        pass
 
-# ================= KEYBOARDS =================
-
-def group_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📅 Navbat")],
-            [KeyboardButton(text="📋 Ro‘yxat")],
-            [KeyboardButton(text="📚 Tarix")]
-        ],
-        resize_keyboard=True
-    )
-
-def admin_private_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📅 Navbat")],
-            [KeyboardButton(text="📋 Ro‘yxat")],
-            [KeyboardButton(text="📚 Tarix")],
-            [KeyboardButton(text="➕ O‘quvchi qo‘shish")],
-            [KeyboardButton(text="❌ O‘quvchi o‘chirish")]
-        ],
-        resize_keyboard=True
-    )
-
-def is_admin(message: types.Message):
-    return message.from_user.id in ADMIN_IDS
+async def smart_reply(message, text, seconds=180):
+    msg = await message.answer(text, parse_mode="HTML")
+    if message.chat.type in ["group", "supergroup"]:
+        asyncio.create_task(auto_delete(msg, seconds))
+    return msg
 
 # ================= DATABASE =================
 
@@ -88,237 +69,115 @@ async def init_db():
         )
         """)
 
-async def add_student(name, date):
-    async with db_pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO students (name, shanbalik_date) VALUES ($1, $2)",
-            name, date
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS birthdays (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            name TEXT,
+            birth_date DATE
         )
-
-async def get_all_students():
-    async with db_pool.acquire() as conn:
-        return await conn.fetch(
-            "SELECT id, name, shanbalik_date FROM students ORDER BY shanbalik_date"
-        )
-
-async def get_next_student():
-    async with db_pool.acquire() as conn:
-        return await conn.fetchrow("""
-        SELECT name, shanbalik_date
-        FROM students
-        WHERE shanbalik_date >= CURRENT_DATE
-        ORDER BY shanbalik_date
-        LIMIT 1
         """)
 
-async def delete_student_by_id(student_id):
-    async with db_pool.acquire() as conn:
-        await conn.execute("DELETE FROM students WHERE id=$1", student_id)
+# ================= ABOUT =================
 
-async def archive_completed():
-    async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT id, name, shanbalik_date
-            FROM students
-            WHERE shanbalik_date < CURRENT_DATE
-        """)
+@dp.message(lambda m: m.text == "/about")
+async def about_handler(message: types.Message):
+    msg = (
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🚀 <b>ShanbalikPro</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "📦 Version: 1.1\n"
+        "📅 Project Started: 3 March 2026\n"
+        "📍 Saint Petersburg\n\n"
+        "Mini-startup edition 🔥\n"
+        "━━━━━━━━━━━━━━━━━━"
+    )
 
-        for row in rows:
-            await conn.execute("""
-                INSERT INTO shanbalik_history (name, shanbalik_date, completed_at)
-                VALUES ($1, $2, $3)
-            """, row["name"], row["shanbalik_date"], datetime.datetime.utcnow())
+    sent = await message.answer(msg, parse_mode="HTML")
+    asyncio.create_task(auto_delete(sent, 60))
 
-            await conn.execute(
-                "DELETE FROM students WHERE id=$1",
-                row["id"]
-            )
+# ================= BIRTHDAY ADD =================
 
-# ================= HANDLERS =================
+@dp.message(lambda m: m.chat.type == "private")
+async def birthday_add(message: types.Message):
+    if "tug‘ilgan" in message.text.lower():
+        try:
+            date_str = message.text.split()[-1]
+            birth_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
 
-@dp.message()
-async def handle_message(message: types.Message):
-        # ===== SLASH BUYRUQLARNI 2 SONIYADA O‘CHIRISH =====
-    if message.text and message.text.startswith("/"):
-
-        async def delete_later(msg):
-            await asyncio.sleep(2)
-            try:
-                await msg.delete()
-            except:
-                pass
-
-        asyncio.create_task(delete_later(message))
-
-    text = message.text
-    if not text:
-        return
-    if not text:
-        return
-
-    # START
-    if text == "/start":
-
-        if message.chat.type in ["group", "supergroup"]:
-            return await message.answer(
-                "Sinf menyusi 📚",
-                reply_markup=group_keyboard()
-            )
-
-        if message.chat.type == "private":
-
-            if is_admin(message):
-                return await message.answer(
-                    "Admin panel 🔐",
-                    reply_markup=admin_private_keyboard()
-                )
-            else:
-                return await message.answer(
-                    "Sinf menyusi 📚",
-                    reply_markup=group_keyboard()
+            async with db_pool.acquire() as conn:
+                await conn.execute(
+                    "INSERT INTO birthdays (user_id, name, birth_date) VALUES ($1,$2,$3)",
+                    message.from_user.id,
+                    message.from_user.full_name,
+                    birth_date
                 )
 
-    # NAVBAT
-    if text == "📅 Navbat" or text == "/navbat":
-        student = await get_next_student()
-        if not student:
-            return await message.answer("Navbat topilmadi.")
+            await message.answer("🎂 Tug‘ilgan kun saqlandi!")
+        except:
+            await message.answer("Format: 2007-05-14")
 
-        remaining = (student["shanbalik_date"] - datetime.date.today()).days
+# ================= BIRTHDAY REMINDER =================
 
-        msg = f"━━━━━━━━━━━━━━━━━━\n"
-        msg += f"📅 <b>NAVBAT</b>\n"
-        msg += f"━━━━━━━━━━━━━━━━━━\n\n"
-        msg += f"👤 <b>{student['name']}</b>\n"
-        msg += f"🗓 {format_date_uz(student['shanbalik_date'])}\n"
-        msg += f"⏳ Qolgan kun: {remaining}\n"
-        msg += f"\n━━━━━━━━━━━━━━━━━━"
+async def birthday_reminder():
+    today = datetime.datetime.now(UZ_TZ).date()
 
-        return await message.answer(msg, parse_mode="HTML")
-
-    # RO'YXAT PREMIUM
-    if text == "📋 Ro‘yxat" or text == "/list":
-        students = await get_all_students()
-        if not students:
-            return await message.answer("Ro‘yxat bo‘sh.")
-
-        msg = "━━━━━━━━━━━━━━━━━━\n"
-        msg += "📚 <b>SHANBALIK RO‘YXATI 2026</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-
-        for i, s in enumerate(students, start=1):
-            msg += f"{i}️⃣ <b>{s['name']}</b>\n"
-            msg += f"🗓 {format_date_uz(s['shanbalik_date'])}\n\n"
-
-        msg += "━━━━━━━━━━━━━━━━━━\n"
-        msg += f"Jami: {len(students)} ta o‘quvchi"
-
-        return await message.answer(msg, parse_mode="HTML")
-
-    # TARIX
-    if text == "📚 Tarix" or text == "/history":
-        async with db_pool.acquire() as conn:
-            rows = await conn.fetch("""
-                SELECT name, shanbalik_date
-                FROM shanbalik_history
-                ORDER BY completed_at DESC
-                LIMIT 10
-            """)
-
-        if not rows:
-            return await message.answer("Tarix bo‘sh.")
-
-        msg = "━━━━━━━━━━━━━━━━━━\n"
-        msg += "📚 <b>OXIRGI 10 TA TARIX</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-
-        for r in rows:
-            msg += f"👤 <b>{r['name']}</b>\n"
-            msg += f"🗓 {format_date_uz(r['shanbalik_date'])}\n\n"
-
-        msg += "━━━━━━━━━━━━━━━━━━"
-
-        return await message.answer(msg, parse_mode="HTML")
-
-    # ADMIN QO‘SHISH
-    if text == "➕ O‘quvchi qo‘shish":
-        if not is_admin(message) or message.chat.type != "private":
-            return await message.answer("Ruxsat yo‘q ❌")
-
-        return await message.answer(
-            "Ism va sanani yuboring:\nMasalan:\nAli, 2026-09-01"
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT name FROM birthdays WHERE EXTRACT(MONTH FROM birth_date)=$1 AND EXTRACT(DAY FROM birth_date)=$2",
+            today.month, today.day
         )
 
-    # ADMIN O‘CHIRISH
-    if text == "❌ O‘quvchi o‘chirish":
-        if not is_admin(message) or message.chat.type != "private":
-            return await message.answer("Ruxsat yo‘q ❌")
+    for r in rows:
+        msg = (
+            "━━━━━━━━━━━━━━━━━━\n"
+            "🎉 <b>BUGUN TUG‘ILGAN KUN!</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            f"🎂 <b>{r['name']}</b>\n"
+            "Sizni chin qalbimizdan tabriklaymiz!\n"
+            "Baxt, sog‘lik va omad tilaymiz! 🥳\n\n"
+            "━━━━━━━━━━━━━━━━━━"
+        )
 
-        students = await get_all_students()
+        await bot.send_message(GROUP_ID, msg, parse_mode="HTML")
 
-        for s in students:
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="❌ O‘chirish",
-                    callback_data=f"delete_{s['id']}"
-                )]
-            ])
-
-            await message.answer(
-                f"{s['name']} - {format_date_uz(s['shanbalik_date'])}",
-                reply_markup=keyboard
-            )
-
-    # ADMIN REAL ADD
-    if message.chat.type == "private" and is_admin(message):
-        if "," in text:
-            try:
-                name, date_str = text.split(",")
-                date_obj = datetime.datetime.strptime(
-                    date_str.strip(),
-                    "%Y-%m-%d"
-                ).date()
-
-                await add_student(name.strip(), date_obj)
-                return await message.answer("Qo‘shildi ✅")
-            except:
-                return await message.answer("Format noto‘g‘ri ❌")
-
-# ================= CALLBACK =================
-
-@dp.callback_query()
-async def handle_callback(callback: types.CallbackQuery):
-
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Siz admin emassiz ❌", show_alert=True)
-        return
-
-    if callback.message.chat.type != "private":
-        await callback.answer("Faqat private chatda ❌", show_alert=True)
-        return
-
-    if callback.data.startswith("delete_"):
-        student_id = int(callback.data.split("_")[1])
-        await delete_student_by_id(student_id)
-        await callback.message.edit_text("O‘chirildi ✅")
-        await callback.answer()
-
-# ================= REMINDER =================
+# ================= DAILY REMINDER =================
 
 async def daily_reminder():
-    await archive_completed()
+    today = datetime.datetime.now(UZ_TZ).date()
 
-    student = await get_next_student()
+    async with db_pool.acquire() as conn:
+        student = await conn.fetchrow("""
+            SELECT name, shanbalik_date
+            FROM students
+            WHERE shanbalik_date >= $1
+            ORDER BY shanbalik_date
+            LIMIT 1
+        """, today)
+
     if not student:
         return
 
-    remaining = (student["shanbalik_date"] - datetime.date.today()).days
+    remaining = (student["shanbalik_date"] - today).days
 
     if remaining == 1:
         await bot.send_message(GROUP_ID, f"Ertaga shanbalik: {student['name']}")
-
     elif remaining == 0:
         await bot.send_message(GROUP_ID, f"Bugun shanbalik: {student['name']}")
+
+# ================= STARTUP =================
+
+@app.on_event("startup")
+async def on_startup():
+    global db_pool
+    db_pool = await asyncpg.create_pool(DATABASE_URL)
+    await init_db()
+
+    scheduler.add_job(daily_reminder, "cron", hour=8, minute=0)
+    scheduler.add_job(birthday_reminder, "cron", hour=6, minute=0)
+    scheduler.start()
+
+    await bot.set_webhook(WEBHOOK_URL)
 
 # ================= WEBHOOK =================
 
@@ -328,17 +187,6 @@ async def webhook_handler(request: Request):
     update = Update.model_validate(data)
     await dp.feed_update(bot, update)
     return JSONResponse({"ok": True})
-
-@app.on_event("startup")
-async def on_startup():
-    global db_pool
-    db_pool = await asyncpg.create_pool(DATABASE_URL)
-    await init_db()
-
-    scheduler.add_job(daily_reminder, "cron", hour=8, minute=0)
-    scheduler.start()
-
-    await bot.set_webhook(WEBHOOK_URL)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
