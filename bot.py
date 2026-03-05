@@ -151,6 +151,41 @@ async def get_current_student():
 
         return student
 
+async def reset_rotation_if_empty():
+
+    async with db_pool.acquire() as conn:
+
+        count = await conn.fetchval("SELECT COUNT(*) FROM students")
+
+        if count == 0:
+
+            rows = await conn.fetch("""
+                SELECT name
+                FROM history
+                ORDER BY id
+            """)
+
+            if not rows:
+                return
+
+            start_date = datetime.now(UZ_TZ).date()
+
+            for i, r in enumerate(rows):
+
+                new_date = start_date + timedelta(days=i)
+
+                await conn.execute(
+                    """
+                    INSERT INTO students (name, position, shanbalik_date)
+                    VALUES ($1,$2,$3)
+                    """,
+                    r["name"],
+                    i + 1,
+                    new_date
+                )
+
+            await conn.execute("DELETE FROM history")
+            
 # ================= REMINDER =================
 
 async def monthly_reminder():
@@ -234,9 +269,10 @@ System Status: 🟢 Active
 
 @dp.message(F.text == "📊 Navbat")
 async def navbat(message: types.Message):
-
+    
     await move_past_students_to_history()
-
+    await reset_rotation_if_empty()
+    
     student = await get_current_student()
 
     if not student:
