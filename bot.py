@@ -42,7 +42,7 @@ async def auto_delete(message, seconds):
 
 
 async def smart_send(message, text, seconds):
-    sent = await message.answer(text)
+    sent = await message.answer(text, parse_mode="HTML")
     if message.chat.type in ["group", "supergroup"]:
         asyncio.create_task(auto_delete(sent, seconds))
         asyncio.create_task(auto_delete(message, seconds))
@@ -265,7 +265,7 @@ async def navbat(message: types.Message):
 
     text += "\n━━━━━━━━━━━━━━━━━━"
 
-    await smart_send(message, text, 180)
+    await smart_send(message, f"<pre>{text}</pre>", 180)
 
 # ================= RO‘YXAT =================
 
@@ -296,8 +296,8 @@ async def royxat(message: types.Message):
         text += f"{i:>2}. {r['name']:<18} {formatted_date}\n"
 
     text += "\n━━━━━━━━━━━━━━━━━━"
-
-    await smart_send(message, text, 300)
+    
+    await smart_send(message, f"<pre>{text}</pre>", 300)
 
 # ================= TARIX =================
 
@@ -329,7 +329,7 @@ async def tarix(message: types.Message):
 
     text += "\n━━━━━━━━━━━━━━━━━━"
 
-    await smart_send(message, text, 300)
+    await smart_send(message, f"<pre>{text}</pre>", 300)
 
 # ================= ADD STUDENT =================
 
