@@ -177,7 +177,6 @@ System Status: 🟢 Active
         reply_markup=admin_keyboard() if is_admin else user_keyboard()
     )
 
-
 # ================= NAVBAT =================
 
 @dp.message(F.text == "📊 Navbat")
@@ -188,20 +187,34 @@ async def navbat(message: types.Message):
     student = await get_current_student()
 
     if not student:
-        await smart_send(message, "Ro’yxat bo’sh.", 180)
+        await smart_send(message, "Ro’yxat bo‘sh.", 180)
         return
 
-    next_date = next_first_day()
-    days_left = (next_date - datetime.now(UZ_TZ).date()).days
+    months = [
+        "yanvar","fevral","mart","aprel","may","iyun",
+        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
+    ]
+
+    today = datetime.now(UZ_TZ).date()
+    next_date = student["shanbalik_date"]
+
+    days_left = (next_date - today).days
+
+    day = next_date.day
+    month = months[next_date.month - 1]
+    year = next_date.year
+
+    formatted_date = f"{day}-{month} {year}"
 
     text = f"""
 ━━━━━━━━━━━━━━━━━━
-📊 𝐍𝐀𝐕𝐁𝐀𝐓
+📊 NAVBAT
 ━━━━━━━━━━━━━━━━━━
 
 👤 {student['name']}
-📅 Sana: {next_date}
+📅 Sana: {formatted_date}
 ⏳ Qolgan kun: {days_left} kun
+
 ━━━━━━━━━━━━━━━━━━
 """
 
@@ -260,13 +273,26 @@ async def tarix(message: types.Message):
 
     text = "━━━━━━━━━━━━━━━━━━\n📜 TARIX\n━━━━━━━━━━━━━━━━━━\n\n"
 
-    for r in rows:
-        text += f"{r['name']} — {r['shanbalik_date']}\n"
+    months = [
+        "yanvar","fevral","mart","aprel","may","iyun",
+        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
+    ]
+
+    for i, r in enumerate(rows, start=1):
+
+        date = r["shanbalik_date"]
+
+        day = date.day
+        month = months[date.month-1]
+        year = date.year
+
+        formatted_date = f"{day}-{month} {year}"
+
+        text += f"{i}. {r['name']:<15} {formatted_date}\n"
 
     text += "\n━━━━━━━━━━━━━━━━━━"
 
     await smart_send(message, text, 300)
-
 
 # ================= ADD STUDENT =================
 
