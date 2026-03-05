@@ -275,6 +275,51 @@ System Status: 🟢 Active
         reply_markup=admin_keyboard() if is_admin else user_keyboard()
     )
 
+# ================= ABOUT =================
+
+@dp.message(F.text == "/about")
+async def about(message: types.Message):
+
+    text = """
+🤖 BOT HAQIDA
+
+📌 Shanbalik navbat bot
+📅 Navbatlarni avtomatik yuritadi
+⏰ Eslatmalar yuboradi
+
+👨‍💻 Developer: Shukurullo
+⚙️ Version: 1.1
+"""
+
+    await message.answer(text)
+
+# ================= ID ======================
+
+@dp.message(F.text == "/id")
+async def get_id(message: types.Message):
+
+    text = f"""
+🆔 Sizning ID: {message.from_user.id}
+💬 Chat ID: {message.chat.id}
+"""
+
+    await message.answer(text)
+
+# ================= PING =================
+
+@dp.message(F.text == "/ping")
+async def ping(message: types.Message):
+
+    text = """
+🏓 BOT STATUS
+
+⚙️ System: Active
+🤖 Bot: Working
+📡 Connection: OK
+"""
+
+    await message.answer(text)
+
 # ================= NAVBAT =================
 
 @dp.message(F.text == "📊 Navbat")
@@ -405,7 +450,7 @@ async def catch_private(message: types.Message):
 
     # 🎂 Birthday
     try:
-        birth_date = datetime.datetime.strptime(message.text, "%Y-%m-%d").date()
+        birth_date = datetime.strptime(message.text, "%Y-%m-%d").date()
 
         async with db_pool.acquire() as conn:
             await conn.execute("""
