@@ -195,47 +195,29 @@ async def monthly_reminder():
     if not student:
         return
 
+    today = datetime.now(UZ_TZ).date()
+    shanbalik_date = student["shanbalik_date"]
+
+    # faqat 3 kun oldin eslatadi (28 sana bo‘lishi uchun)
+    if (shanbalik_date - today).days != 3:
+        return
+
     months = [
         "yanvar","fevral","mart","aprel","may","iyun",
         "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
     ]
 
-    date = student["shanbalik_date"]
-
-    formatted_date = f"{date.day}-{months[date.month-1]} {date.year}"
+    formatted_date = f"{shanbalik_date.day}-{months[shanbalik_date.month-1]} {shanbalik_date.year}"
 
     text = f"""
 📢 Eslatma
 
-Keyingi shanbalik navbati:
+Yaqinlashayotgan shanbalik navbati:
 
 👤 {student['name']}
 📅 {formatted_date}
 
 Tayyor bo‘ling.
-"""
-
-    await bot.send_message(GROUP_ID, text)
-
-
-async def today_reminder():
-
-    student = await get_current_student()
-
-    if not student:
-        return
-
-    today = datetime.now(UZ_TZ).date()
-
-    if student["shanbalik_date"] != today:
-        return
-
-    text = f"""
-📢 Bugun shanbalik!
-
-👤 {student['name']}
-
-Bugun sizning navbatingiz.
 """
 
     await bot.send_message(GROUP_ID, text)
@@ -443,7 +425,7 @@ async def startup():
 
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
-    scheduler.add_job(monthly_reminder, "cron", day=28, hour=6, minute=0)
+    scheduler.add_job(monthly_reminder, "cron", hour=6, minute=0)
     scheduler.add_job(today_reminder, "cron", hour=6, minute=0)
     scheduler.start()
 
