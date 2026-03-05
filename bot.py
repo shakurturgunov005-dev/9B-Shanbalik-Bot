@@ -122,12 +122,12 @@ async def move_past_students_to_history():
 
 
 def next_first_day():
-    today = datetime.datetime.now(UZ_TZ)
+    today = datetime.now(UZ_TZ)
 
     if today.month == 12:
-        return datetime.date(today.year + 1, 1, 1)
+        return datetime(today.year + 1, 1, 1).date()
 
-    return datetime.date(today.year, today.month + 1, 1)
+    return datetime(today.year, today.month + 1, 1).date()
 
 
 async def get_current_student():
