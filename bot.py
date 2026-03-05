@@ -192,7 +192,7 @@ async def navbat(message: types.Message):
         return
 
     next_date = next_first_day()
-    days_left = (next_date - datetime.date.today()).days
+    days_left = (next_date - datetime.now(UZ_TZ).date()).days
 
     text = f"""
 ━━━━━━━━━━━━━━━━━━
@@ -206,7 +206,6 @@ async def navbat(message: types.Message):
 """
 
     await smart_send(message, text, 180)
-
 
 # ================= RO‘YXAT =================
 
