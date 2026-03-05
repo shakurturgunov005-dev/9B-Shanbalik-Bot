@@ -198,7 +198,6 @@ async def monthly_reminder():
     today = datetime.now(UZ_TZ).date()
     shanbalik_date = student["shanbalik_date"]
 
-    # faqat 3 kun oldin eslatadi (28 sana bo‘lishi uchun)
     if (shanbalik_date - today).days != 3:
         return
 
@@ -221,8 +220,9 @@ Tayyor bo‘ling.
 """
 
     await bot.send_message(GROUP_ID, text)
-    
-    async def today_reminder():
+
+
+async def today_reminder():
 
     student = await get_current_student()
 
