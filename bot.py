@@ -253,23 +253,17 @@ async def navbat(message: types.Message):
 
     days_left = (next_date - today).days
 
-    day = next_date.day
-    month = months[next_date.month - 1]
-    year = next_date.year
+    formatted_date = f"{next_date.day}-{months[next_date.month-1]} {next_date.year}"
 
-    formatted_date = f"{day}-{month} {year}"
+    text = "━━━━━━━━━━━━━━━━━━\n"
+    text += "📊 NAVBAT\n"
+    text += "━━━━━━━━━━━━━━━━━━\n\n"
 
-    text = f"""
-━━━━━━━━━━━━━━━━━━
-📊 NAVBAT
-━━━━━━━━━━━━━━━━━━
+    text += f"👤 {student['name']:<18}\n"
+    text += f"📅 {formatted_date:<18}\n"
+    text += f"⏳ {days_left} kun qoldi\n"
 
-👤 {student['name']}
-📅 Sana: {formatted_date}
-⏳ Qolgan kun: {days_left} kun
-
-━━━━━━━━━━━━━━━━━━
-"""
+    text += "\n━━━━━━━━━━━━━━━━━━"
 
     await smart_send(message, text, 180)
 
@@ -285,7 +279,7 @@ async def royxat(message: types.Message):
         await smart_send(message, "Ro‘yxat bo‘sh.", 300)
         return
 
-    text = "📋 RO‘YXAT\n\n```\n"
+    text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
 
     months = [
         "yanvar","fevral","mart","aprel","may","iyun",
@@ -297,12 +291,11 @@ async def royxat(message: types.Message):
     for i, r in enumerate(rows, start=1):
 
         date = start_date + timedelta(days=i-1)
-
         formatted_date = f"{date.day}-{months[date.month-1]} {date.year}"
 
         text += f"{i:>2}. {r['name']:<18} {formatted_date}\n"
 
-    text += "```"
+    text += "\n━━━━━━━━━━━━━━━━━━"
 
     await smart_send(message, text, 300)
 
@@ -330,12 +323,7 @@ async def tarix(message: types.Message):
     for i, r in enumerate(rows, start=1):
 
         date = r["shanbalik_date"]
-
-        day = date.day
-        month = months[date.month-1]
-        year = date.year
-
-        formatted_date = f"{day}-{month} {year}"
+        formatted_date = f"{date.day}-{months[date.month-1]} {date.year}"
 
         text += f"{i:>2}. {r['name']:<18} {formatted_date}\n"
 
