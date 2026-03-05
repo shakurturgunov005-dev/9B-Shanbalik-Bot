@@ -221,27 +221,29 @@ async def royxat(message: types.Message):
         return
 
     text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
-    
-months = [
-"yanvar","fevral","mart","aprel","may","iyun",
-"iyul","avgust","sentabr","oktabr","noyabr","dekabr"
-]
 
-start_date = datetime(2026, 4, 1)
+    months = [
+        "yanvar","fevral","mart","aprel","may","iyun",
+        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
+    ]
 
-for i, r in enumerate(rows, start=1):
+    start_date = datetime(2026, 4, 1)
 
-    date = start_date + timedelta(days=i-1)
+    for i, r in enumerate(rows, start=1):
 
-    day = date.day
-    month = months[date.month-1]
-    year = date.year
+        date = start_date + timedelta(days=i-1)
 
-    formatted_date = f"{day}-{month} {year}"
+        day = date.day
+        month = months[date.month-1]
+        year = date.year
 
-    text += f"{i}. {r['name']:<15} {formatted_date}\n"
+        formatted_date = f"{day}-{month} {year}"
 
-await smart_send(message, text, 300)
+        text += f"{i}. {r['name']:<15} {formatted_date}\n"
+
+    text += "\n━━━━━━━━━━━━━━━━━━"
+
+    await smart_send(message, text, 300)
 
 # ================= TARIX =================
 
