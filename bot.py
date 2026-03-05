@@ -262,6 +262,51 @@ async def set_commands(bot):
 
     await bot.set_my_commands(commands)
     
+# ================= MENYU =================
+    
+async def set_commands(bot):
+
+    commands = [
+
+        BotCommand(
+            command="start",
+            description="Botni ishga tushirish"
+        ),
+
+        BotCommand(
+            command="navbat",
+            description="Hozirgi shanbalik navbati"
+        ),
+
+        BotCommand(
+            command="royxat",
+            description="Shanbalik ro‘yxati"
+        ),
+
+        BotCommand(
+            command="tarix",
+            description="O‘tgan shanbaliklar"
+        ),
+
+        BotCommand(
+            command="about",
+            description="Bot haqida ma'lumot"
+        ),
+
+        BotCommand(
+            command="id",
+            description="Sizning Telegram ID"
+        ),
+
+        BotCommand(
+            command="ping",
+            description="Bot ishlayotganini tekshirish"
+        )
+
+    ]
+
+    await bot.set_my_commands(commands)
+    
 # ================= COMMANDS =================
 
 @dp.message(CommandStart())
