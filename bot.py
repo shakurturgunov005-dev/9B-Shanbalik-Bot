@@ -456,7 +456,7 @@ async def catch_private(message: types.Message):
             await conn.execute("""
                 INSERT INTO birthdays (user_id,name,birth_date)
                 VALUES ($1,$2,$3)
-                ON CONFLICT (user_id) DO NOTHING
+                ON CONFLICT DO NOTHING
             """,
             message.from_user.id,
             message.from_user.full_name,
