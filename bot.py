@@ -7,6 +7,7 @@ import pytz
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from aiogram import Bot, Dispatcher, types, F
+from datetime import datetime, timedelta
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
@@ -220,8 +221,7 @@ async def royxat(message: types.Message):
         return
 
     text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
-from datetime import datetime, timedelta
-
+    
 months = [
 "yanvar","fevral","mart","aprel","may","iyun",
 "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
