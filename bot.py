@@ -285,7 +285,7 @@ async def royxat(message: types.Message):
         await smart_send(message, "Ro‘yxat bo‘sh.", 300)
         return
 
-    text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
+    text = "📋 RO‘YXAT\n\n```\n"
 
     months = [
         "yanvar","fevral","mart","aprel","may","iyun",
@@ -298,15 +298,11 @@ async def royxat(message: types.Message):
 
         date = start_date + timedelta(days=i-1)
 
-        day = date.day
-        month = months[date.month-1]
-        year = date.year
-
-        formatted_date = f"{day}-{month} {year}"
+        formatted_date = f"{date.day}-{months[date.month-1]} {date.year}"
 
         text += f"{i:>2}. {r['name']:<18} {formatted_date}\n"
 
-    text += "\n━━━━━━━━━━━━━━━━━━"
+    text += "```"
 
     await smart_send(message, text, 300)
 
