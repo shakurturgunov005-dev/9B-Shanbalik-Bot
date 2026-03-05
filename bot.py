@@ -304,7 +304,7 @@ async def royxat(message: types.Message):
 
         formatted_date = f"{day}-{month} {year}"
 
-        text += f"{i}. {r['name']:<15} {formatted_date}\n"
+        text += f"{i:>2}. {r['name']:<18} {formatted_date}\n"
 
     text += "\n━━━━━━━━━━━━━━━━━━"
 
@@ -341,7 +341,7 @@ async def tarix(message: types.Message):
 
         formatted_date = f"{day}-{month} {year}"
 
-        text += f"{i}. {r['name']:<15} {formatted_date}\n"
+        text += f"{i:>2}. {r['name']:<18} {formatted_date}\n"
 
     text += "\n━━━━━━━━━━━━━━━━━━"
 
