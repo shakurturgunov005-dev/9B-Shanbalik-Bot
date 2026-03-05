@@ -1,6 +1,5 @@
 import asyncio
 import os
-import datetime
 import asyncpg
 import pytz
 
@@ -217,7 +216,6 @@ Yaqinlashayotgan shanbalik navbati:
 👤 {student['name']}
 📅 {formatted_date}
 
-Tayyor bo‘ling.
 """
 
     await bot.send_message(GROUP_ID, text)
@@ -381,7 +379,7 @@ async def navbat(message: types.Message):
 async def royxat(message: types.Message):
 
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch("SELECT name FROM students ORDER BY position")
+        rows = await conn.fetch("SELECT name, shanbalik_date FROM students ORDER BY position")
 
     if not rows:
         await smart_send(message, "Ro‘yxat bo‘sh.", 300)
@@ -513,16 +511,17 @@ async def startup():
     await set_commands(bot)
 
     global db_pool
-
+    
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
-    scheduler.add_job(monthly_reminder, "cron", hour=6, minute=0)
-    scheduler.add_job(today_reminder, "cron", hour=6, minute=0)
-    scheduler.start()
-
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(WEBHOOK_URL)
-
+    
+    scheduler.add_job(monthly_reminder, "cron", day=1, hour=9, minute=0)
+    scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
+    
+    scheduler.start()
+    
 # ================= WEBHOOK =================
 
 @app.post("/webhook")
@@ -542,8 +541,9 @@ async def webhook(request: Request):
 
         return JSONResponse({"error": str(e)}, status_code=500)
 
-
 # ================= RUN =================
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    
+    
