@@ -220,14 +220,28 @@ async def royxat(message: types.Message):
         return
 
     text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
+from datetime import datetime, timedelta
 
-    for i, r in enumerate(rows, start=1):
-        text += f"{i}. {r['name']}\n"
+months = [
+"yanvar","fevral","mart","aprel","may","iyun",
+"iyul","avgust","sentabr","oktabr","noyabr","dekabr"
+]
 
-    text += "\n━━━━━━━━━━━━━━━━━━"
+start_date = datetime(2026, 4, 1)
 
-    await smart_send(message, text, 300)
+for i, r in enumerate(rows, start=1):
 
+    date = start_date + timedelta(days=i-1)
+
+    day = date.day
+    month = months[date.month-1]
+    year = date.year
+
+    formatted_date = f"{day}-{month} {year}"
+
+    text += f"{i}. {r['name']:<15} {formatted_date}\n"
+
+await smart_send(message, text, 300)
 
 # ================= TARIX =================
 
