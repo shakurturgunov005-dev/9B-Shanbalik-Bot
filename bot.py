@@ -222,6 +222,34 @@ Tayyor bo‘ling.
 
     await bot.send_message(GROUP_ID, text)
     
+    async def today_reminder():
+
+    student = await get_current_student()
+
+    if not student:
+        return
+
+    today = datetime.now(UZ_TZ).date()
+
+    if student["shanbalik_date"] != today:
+        return
+
+    months = [
+        "yanvar","fevral","mart","aprel","may","iyun",
+        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
+    ]
+
+    formatted_date = f"{today.day}-{months[today.month-1]} {today.year}"
+
+    text = f"""
+📢 Bugun shanbalik
+
+👤 {student['name']}
+📅 {formatted_date}
+"""
+
+    await bot.send_message(GROUP_ID, text)
+    
 # ================= COMMANDS =================
 
 @dp.message(CommandStart())
