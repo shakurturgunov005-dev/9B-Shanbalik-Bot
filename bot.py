@@ -407,20 +407,37 @@ async def inline_buttons_handler(callback: CallbackQuery):
         
         await callback.answer()
     except Exception as e:
-        await callback.answer(text=f"Xatolik: {str(e)}", show_alert=True)@dp.message(Command("about"))
+        await callback.answer(text=f"Xatolik: {str(e)}", show_alert=True)
         
+@dp.message(Command("about"))
 async def about(message: Message):
     text = """
-🤖 BOT HAQIDA
+━━━━━━━━━━━━━━━━━━━━━━━━━
+   🤖 **BOT HAQIDA**    
+━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📌 Shanbalik navbat bot
+📌 **Shanbalik navbat bot**
 📅 Navbatlarni avtomatik yuritadi
 ⏰ Eslatmalar yuboradi
 
-👨‍💻 Developer: Shukurullo
-⚙️ Version: 1.4
+━━━━━━━━━━━━━━━━━━━━━━━━━
+   🚀 **TEZ KUNDA** 
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ **AI Integratsiya** 
+   [████████▒▒▒▒▒▒] 40%
+
+   • 🤖 Sun'iy intellekt
+   • 📊 Tahlil tizimi
+   • 💬 Muloqot moduli
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+👨‍💻 **Developer:** Shukurullo
+📅 **2026**
+⚙️ **Version: 1.5**
+━━━━━━━━━━━━━━━━━━━━━━━━━
 """
-    await message.answer(text)
+    await message.answer(text, parse_mode="Markdown")
 
 @dp.message(Command("id"))
 async def get_id(message: Message):
