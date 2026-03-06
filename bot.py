@@ -403,17 +403,16 @@ System Status: 🟢 Active
 ━━━━━━━━━━━━━━━━━━
 """
 
-    if message.chat.type == "private":
+if message.chat.type == "private":
     await message.answer(
         text,
-        reply_markup=admin_keyboard() if is_admin else user_keyboard()
+        reply_markup=admin_keyboard() if is_admin else group_keyboard
     )
 else:
     await message.answer(
-    text,
-    reply_markup=group_keyboard()
-)
-
+        text,
+        reply_markup=group_keyboard
+    )
 # ================= ABOUT =================
 
 @dp.message(Command("about"))
