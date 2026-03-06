@@ -4,6 +4,7 @@ import asyncpg
 import pytz
 import random
 from datetime import datetime, timedelta
+from urllib.parse import urlparse  # BU QATOR MUHIM!
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (
@@ -21,11 +22,16 @@ import uvicorn
 # ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+# MUHIM: DATABASE URL NI TO'G'RIDAN-TO'G'RI YOZAMIZ
+DATABASE_URL = "postgresql://postgres:QfIuxRfbwyKyLdrnOiexCsVnVzmneCuY@metro.proxy.rlwy.net:31961/railway"
+
+# Database URL ni tekshirish
+if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
+
+print(f"📦 Database URL: {DATABASE_URL[:30]}...")  # Logga yozish
+
 GROUP_ID = -1003557503048
 ADMIN_IDS = [6042457335]
 
@@ -41,7 +47,7 @@ scheduler = AsyncIOScheduler(timezone=UZ_TZ)
 db_pool = None
 
 # ================= KEYBOARDS =================
-# INLINE KEYBOARD (GURUHLAR UCHUN) - AIOGRAM 3.4.1 UCHUN TO'G'RI
+# INLINE KEYBOARD (GURUHLAR UCHUN)
 group_inline_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="📅 Navbat", callback_data="navbat")],
@@ -81,7 +87,7 @@ async def smart_send(message: Message, text: str, seconds: int):
         asyncio.create_task(auto_delete(sent, seconds))
         asyncio.create_task(auto_delete(message, seconds))
     return sent
-
+    
 # ================= DATABASE =================
 async def init_db():
     async with db_pool.acquire() as conn:
@@ -420,34 +426,59 @@ async def catch_private(message: Message):
 async def startup():
     global db_pool
     
-    # Komandalarni o'rnatish
-    commands = [
-        BotCommand(command="start", description="Botni ishga tushirish"),
-        BotCommand(command="navbat", description="Hozirgi navbat"),
-        BotCommand(command="royxat", description="Ro'yxat"),
-        BotCommand(command="tarix", description="Tarix"),
-        BotCommand(command="about", description="Bot haqida"),
-        BotCommand(command="id", description="ID ni ko'rish"),
-        BotCommand(command="ping", description="Bot holati")
-    ]
-    await bot.set_my_commands(commands)
-    
-    # Database
-    db_pool = await asyncpg.create_pool(DATABASE_URL)
-    await init_db()
-    
-    # Webhook
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(WEBHOOK_URL)
-    
-    # SCHEDULER (AVTOMATIK ESLATMALAR)
-    scheduler.add_job(monthly_reminder, "cron", day=1, hour=9, minute=0)
-    scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
-    scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
-    scheduler.start()
-    
-    print("✅ Bot ishga tushdi! AIogram 3.4.1")
-
+    try:
+        # Komandalarni o'rnatish
+        commands = [
+            BotCommand(command="start", description="Botni ishga tushirish"),
+            BotCommand(command="navbat", description="Hozirgi navbat"),
+            BotCommand(command="royxat", description="Ro'yxat"),
+            BotCommand(command="tarix", description="Tarix"),
+            BotCommand(command="about", description="Bot haqida"),
+            BotCommand(command="id", description="ID ni ko'rish"),
+            BotCommand(command="ping", description="Bot holati")
+        ]
+        await bot.set_my_commands(commands)
+        
+        # Database ulanishi
+        print(f"🔄 Database ga ulanish: {DATABASE_URL[:50]}...")
+        
+        # Maxsus parametrlar bilan ulanish
+        db_pool = await asyncpg.create_pool(
+            DATABASE_URL,
+            min_size=1,
+            max_size=10,
+            command_timeout=60,
+            max_queries=50000,
+            max_inactive_connection_lifetime=300
+        )
+        
+        # Test query
+        async with db_pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+            print("✅ Database test query muvaffaqiyatli!")
+        
+        await init_db()
+        print("✅ Database jadvallari yaratildi!")
+        
+        # Webhook
+        await bot.delete_webhook(drop_pending_updates=True)
+        await bot.set_webhook(WEBHOOK_URL)
+        print(f"✅ Webhook sozlandi: {WEBHOOK_URL}")
+        
+        # SCHEDULER (AVTOMATIK ESLATMALAR)
+        scheduler.add_job(monthly_reminder, "cron", day=1, hour=9, minute=0)
+        scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
+        scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
+        scheduler.start()
+        print("✅ Scheduler ishga tushdi!")
+        
+        print("✅ Bot ishga tushdi! AIogram 3.4.1")
+        
+    except Exception as e:
+        print(f"❌ XATOLIK: {e}")
+        print(f"❌ Xatolik turi: {type(e)}")
+        import traceback
+        traceback.print_exc()
 # ================= WEBHOOK =================
 @app.post("/webhook")
 async def webhook(request: Request):
