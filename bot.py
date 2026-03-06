@@ -406,12 +406,12 @@ System Status: 🟢 Active
     if message.chat.type == "private":
         await message.answer(
             text,
-            reply_markup=admin_keyboard() if is_admin else group_keyboard()
+            reply_markup=admin_keyboard() if is_admin else group_keyboard
             )
     else:
         await message.answer(
             text,
-            reply_markup=group_keyboard()
+            reply_markup=group_keyboard
         )
 # ================= ABOUT =================
 
