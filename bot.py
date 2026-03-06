@@ -2,6 +2,7 @@ import asyncio
 import os
 import asyncpg
 import pytz
+import random
 
 from aiogram.filters import Command
 from fastapi import FastAPI, Request
@@ -248,6 +249,73 @@ async def today_reminder():
 👤 {student['name']}
 📅 {formatted_date}
 """
+
+    await bot.send_message(GROUP_ID, text)
+    
+#================JUMA TABRIK================
+
+import random
+
+RAMAZON_START = datetime(2026, 2, 18).date()
+RAMAZON_END = datetime(2026, 3, 19).date()
+
+
+ramadan_friday_messages = [
+"""🌙 Ramazon muborak!
+
+Bugun muborak juma kuni.
+Ro‘za tutayotgan barcha musulmonlarning
+ro‘zalarini Alloh qabul qilsin 🤲
+
+✨ Juma muborak!""",
+
+"""🌙 Ramazonning muborak juma kuni!
+
+Alloh tutgan ro‘zalaringizni,
+qilgan ibodatlaringizni qabul qilsin.
+
+🤲 Juma muborak!""",
+
+"""🌙 Ramazon oyidagi muborak juma!
+
+Duolaringiz ijobat,
+ro‘zalaringiz qabul bo‘lsin.
+
+✨ Juma muborak!"""
+]
+
+
+normal_friday_messages = [
+"""🌙 Assalomu alaykum
+
+Bugun muborak juma kuni.
+Alloh barcha musulmonlarning
+duolarini qabul qilsin.
+
+✨ Juma muborak!""",
+
+"""🤲 Juma ayyomi muborak bo‘lsin!
+
+Alloh qilgan ibodatlaringizni
+qabul qilsin.""",
+
+"""🌙 Hayrli juma!
+
+Bugun qilgan duolaringiz,
+niyatlaringiz ijobat bo‘lsin."""
+]
+
+
+async def friday_greeting():
+
+    today = datetime.now(UZ_TZ).date()
+
+    # Ramazon tekshirish
+    if RAMAZON_START <= today <= RAMAZON_END:
+        text = random.choice(ramadan_friday_messages)
+
+    else:
+        text = random.choice(normal_friday_messages)
 
     await bot.send_message(GROUP_ID, text)
 
@@ -566,6 +634,8 @@ async def startup():
     
     scheduler.add_job(monthly_reminder, "cron", day=1, hour=9, minute=0)
     scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
+    scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
+    
     
     scheduler.start()
     
