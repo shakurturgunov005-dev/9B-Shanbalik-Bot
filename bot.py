@@ -3,7 +3,15 @@ import os
 import asyncpg
 import pytz
 import random
-
+from aiogram.types import CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+group_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="📅 Navbat", callback_data="navbat")],
+        [InlineKeyboardButton(text="📋 Ro'yxat", callback_data="royxat")],
+        [InlineKeyboardButton(text="📚 Tarix", callback_data="tarix")]
+    ]
+)
 from aiogram.filters import Command
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -396,12 +404,15 @@ System Status: 🟢 Active
 """
 
     if message.chat.type == "private":
-        await message.answer(
-            text,
-            reply_markup=admin_keyboard() if is_admin else user_keyboard()
-        )
-    else:
-        await message.answer(text)
+    await message.answer(
+        text,
+        reply_markup=admin_keyboard() if is_admin else user_keyboard()
+    )
+else:
+    await message.answer(
+    text,
+    reply_markup=group_keyboard()
+)
 
 # ================= ABOUT =================
 
@@ -638,6 +649,22 @@ async def startup():
     
     
     scheduler.start()
+
+#=================main.py===================
+    
+@dp.callback_query()
+async def inline_buttons(callback: CallbackQuery):
+
+    if callback.data == "navbat":
+        await callback.message.answer("📅 Bugungi navbatchi: ...")
+
+    elif callback.data == "royxat":
+        await callback.message.answer("📋 Talabalar ro'yxati")
+
+    elif callback.data == "tarix":
+        await callback.message.answer("📚 Navbatchilik tarixi")
+
+    await callback.answer()
     
 # ================= WEBHOOK =================
 
