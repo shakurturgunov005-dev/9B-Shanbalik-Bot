@@ -399,10 +399,18 @@ System Status: 🟢 Active
 """
 
     if message.chat.type == "private":
+        
         await message.answer(
-        text,
-        reply_markup=admin_keyboard() if is_admin else group_keyboard
-    )
+            text,
+            reply_markup=admin_keyboard() if is_admin else user_keyboard()
+        )
+
+    else:
+
+        await message.answer(
+            text,
+            reply_markup=group_keyboard
+        )
 #============= Callback handler============
 
 @dp.callback_query()
