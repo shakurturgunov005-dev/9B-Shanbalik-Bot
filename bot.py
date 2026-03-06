@@ -54,7 +54,7 @@ group_reply_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton(text="📊 Navbat"), KeyboardButton(text="📋 Ro‘yxat"), KeyboardButton(text="📜 Tarix")]
     ],
     resize_keyboard=True,
-    is_persistent=True
+
 )
 
 # INLINE KEYBOARD (agar xabar ichida kerak bo'lsa)
