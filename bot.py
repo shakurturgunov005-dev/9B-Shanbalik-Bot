@@ -5,16 +5,10 @@ import pytz
 import random
 from datetime import datetime, timedelta
 
-# AIOGRAM IMPORTLAR TO'G'RILANDI
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
-    BotCommand
+    Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton, BotCommand
 )
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -25,7 +19,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
 
 # ================= CONFIG =================
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -38,7 +31,7 @@ ADMIN_IDS = [6042457335]
 
 UZ_TZ = pytz.timezone("Asia/Tashkent")
 
-# STORAGE QO'SHILDI
+# Bot sozlamalari
 storage = MemoryStorage()
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=storage)
@@ -48,9 +41,8 @@ scheduler = AsyncIOScheduler(timezone=UZ_TZ)
 db_pool = None
 
 # ================= KEYBOARDS =================
-
-# INLINE KEYBOARD TO'G'RI YARATILDI
-group_keyboard = InlineKeyboardMarkup(
+# INLINE KEYBOARD (GURUHLAR UCHUN) - AIOGRAM 3.4.1 UCHUN TO'G'RI
+group_inline_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="📅 Navbat", callback_data="navbat")],
         [InlineKeyboardButton(text="📋 Ro'yxat", callback_data="royxat")],
@@ -76,15 +68,14 @@ def user_keyboard():
     )
 
 # ================= AUTO DELETE =================
-
-async def auto_delete(message, seconds):
+async def auto_delete(message: Message, seconds: int):
     await asyncio.sleep(seconds)
     try:
         await message.delete()
     except:
         pass
 
-async def smart_send(message, text, seconds):
+async def smart_send(message: Message, text: str, seconds: int):
     sent = await message.answer(text, parse_mode="HTML")
     if message.chat.type in ["group", "supergroup"]:
         asyncio.create_task(auto_delete(sent, seconds))
@@ -92,7 +83,6 @@ async def smart_send(message, text, seconds):
     return sent
 
 # ================= DATABASE =================
-
 async def init_db():
     async with db_pool.acquire() as conn:
         await conn.execute("""
@@ -122,8 +112,7 @@ async def init_db():
         )
         """)
 
-# ================= UTIL =================
-
+# ================= UTIL FUNCTIONS =================
 async def move_past_students_to_history():
     async with db_pool.acquire() as conn:
         await conn.execute("""
@@ -132,17 +121,10 @@ async def move_past_students_to_history():
             FROM students
             WHERE shanbalik_date < CURRENT_DATE
         """)
-
         await conn.execute("""
             DELETE FROM students
             WHERE shanbalik_date < CURRENT_DATE
         """)
-
-def next_first_day():
-    today = datetime.now(UZ_TZ)
-    if today.month == 12:
-        return datetime(today.year + 1, 1, 1).date()
-    return datetime(today.year, today.month + 1, 1).date()
 
 async def get_current_student():
     async with db_pool.acquire() as conn:
@@ -153,7 +135,6 @@ async def get_current_student():
             ORDER BY shanbalik_date ASC
             LIMIT 1
         """)
-
         if not student:
             student = await conn.fetchrow("""
                 SELECT *
@@ -167,29 +148,19 @@ async def reset_rotation_if_empty():
     async with db_pool.acquire() as conn:
         count = await conn.fetchval("SELECT COUNT(*) FROM students")
         if count == 0:
-            rows = await conn.fetch("""
-                SELECT name
-                FROM history
-                ORDER BY id
-            """)
+            rows = await conn.fetch("SELECT name FROM history ORDER BY id")
             if not rows:
                 return
             start_date = datetime.now(UZ_TZ).date()
             for i, r in enumerate(rows):
                 new_date = start_date + timedelta(days=i)
                 await conn.execute(
-                    """
-                    INSERT INTO students (name, position, shanbalik_date)
-                    VALUES ($1,$2,$3)
-                    """,
-                    r["name"],
-                    i + 1,
-                    new_date
+                    "INSERT INTO students (name, position, shanbalik_date) VALUES ($1,$2,$3)",
+                    r["name"], i + 1, new_date
                 )
             await conn.execute("DELETE FROM history")
 
-# ================= REMINDER =================
-
+# ================= REMINDER FUNCTIONS =================
 async def monthly_reminder():
     student = await get_current_student()
     if not student:
@@ -198,11 +169,11 @@ async def monthly_reminder():
     shanbalik_date = student["shanbalik_date"]
     if (shanbalik_date - today).days != 3:
         return
-    months = [
-        "yanvar","fevral","mart","aprel","may","iyun",
-        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
-    ]
+    
+    months = ["yanvar","fevral","mart","aprel","may","iyun",
+              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
     formatted_date = f"{shanbalik_date.day}-{months[shanbalik_date.month-1]} {shanbalik_date.year}"
+    
     text = f"""
 📢 Eslatma
 
@@ -211,7 +182,7 @@ Yaqinlashayotgan shanbalik navbati:
 👤 {student['name']}
 📅 {formatted_date}
 """
-    await bot.send_message(GROUP_ID, text)
+    await bot.send_message(chat_id=GROUP_ID, text=text)
 
 async def today_reminder():
     student = await get_current_student()
@@ -220,62 +191,33 @@ async def today_reminder():
     today = datetime.now(UZ_TZ).date()
     if student["shanbalik_date"] != today:
         return
-    months = [
-        "yanvar","fevral","mart","aprel","may","iyun",
-        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
-    ]
+    
+    months = ["yanvar","fevral","mart","aprel","may","iyun",
+              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
     formatted_date = f"{today.day}-{months[today.month-1]} {today.year}"
+    
     text = f"""
 📢 Bugun shanbalik
 
 👤 {student['name']}
 📅 {formatted_date}
 """
-    await bot.send_message(GROUP_ID, text)
+    await bot.send_message(chat_id=GROUP_ID, text=text)
 
-#================JUMA TABRIK================
-
+# ================= JUMA TABRIKLAR =================
 RAMAZON_START = datetime(2026, 2, 18).date()
 RAMAZON_END = datetime(2026, 3, 19).date()
 
 ramadan_friday_messages = [
-"""🌙 Ramazon muborak!
-
-Bugun muborak juma kuni.
-Ro‘za tutayotgan barcha musulmonlarning
-ro‘zalarini Alloh qabul qilsin 🤲
-
-✨ Juma muborak!""",
-"""🌙 Ramazonning muborak juma kuni!
-
-Alloh tutgan ro‘zalaringizni,
-qilgan ibodatlaringizni qabul qilsin.
-
-🤲 Juma muborak!""",
-"""🌙 Ramazon oyidagi muborak juma!
-
-Duolaringiz ijobat,
-ro‘zalaringiz qabul bo‘lsin.
-
-✨ Juma muborak!"""
+    "🌙 Ramazon muborak!\n\nBugun muborak juma kuni.\nRo'za tutayotgan barcha musulmonlarning\nro'zalarini Alloh qabul qilsin 🤲\n\n✨ Juma muborak!",
+    "🌙 Ramazonning muborak juma kuni!\n\nAlloh tutgan ro'zalaringizni,\nqilgan ibodatlaringizni qabul qilsin.\n\n🤲 Juma muborak!",
+    "🌙 Ramazon oyidagi muborak juma!\n\nDuolaringiz ijobat,\nro'zalaringiz qabul bo'lsin.\n\n✨ Juma muborak!"
 ]
 
 normal_friday_messages = [
-"""🌙 Assalomu alaykum
-
-Bugun muborak juma kuni.
-Alloh barcha musulmonlarning
-duolarini qabul qilsin.
-
-✨ Juma muborak!""",
-"""🤲 Juma ayyomi muborak bo‘lsin!
-
-Alloh qilgan ibodatlaringizni
-qabul qilsin.""",
-"""🌙 Hayrli juma!
-
-Bugun qilgan duolaringiz,
-niyatlaringiz ijobat bo‘lsin."""
+    "🌙 Assalomu alaykum\n\nBugun muborak juma kuni.\nAlloh barcha musulmonlarning\nduolarini qabul qilsin.\n\n✨ Juma muborak!",
+    "🤲 Juma ayyomi muborak bo'lsin!\n\nAlloh qilgan ibodatlaringizni\nqabul qilsin.",
+    "🌙 Hayrli juma!\n\nBugun qilgan duolaringiz,\nniyatlaringiz ijobat bo'lsin."
 ]
 
 async def friday_greeting():
@@ -284,26 +226,11 @@ async def friday_greeting():
         text = random.choice(ramadan_friday_messages)
     else:
         text = random.choice(normal_friday_messages)
-    await bot.send_message(GROUP_ID, text)
-
-# ================= COMMANDS SETUP =================
-
-async def set_commands(bot):
-    commands = [
-        BotCommand(command="start", description="Botni ishga tushirish"),
-        BotCommand(command="navbat", description="Hozirgi shanbalik navbati"),
-        BotCommand(command="royxat", description="Shanbalik ro‘yxati"),
-        BotCommand(command="tarix", description="O‘tgan shanbaliklar"),
-        BotCommand(command="about", description="Bot haqida ma'lumot"),
-        BotCommand(command="id", description="Sizning Telegram ID"),
-        BotCommand(command="ping", description="Bot ishlayotganini tekshirish")
-    ]
-    await bot.set_my_commands(commands)
+    await bot.send_message(chat_id=GROUP_ID, text=text)
 
 # ================= COMMAND HANDLERS =================
-
 @dp.message(CommandStart())
-async def start_handler(message: types.Message):
+async def start_handler(message: Message):
     name = message.from_user.full_name
     is_admin = message.from_user.id in ADMIN_IDS
     role = "ADMIN 👑" if is_admin else "USER"
@@ -320,15 +247,16 @@ System Status: 🟢 Active
 """
     if message.chat.type == "private":
         await message.answer(
-            text,
+            text=text,
             reply_markup=admin_keyboard() if is_admin else user_keyboard()
         )
     else:
-        await message.answer(text, reply_markup=group_keyboard)
+        # GURUHLAR UCHUN INLINE TUGMALAR
+        await message.answer(text=text, reply_markup=group_inline_keyboard)
 
-# CALLBACK HANDLER TO'G'RILANDI
+# CALLBACK HANDLER (INLINE TUGMALAR UCHUN)
 @dp.callback_query()
-async def inline_buttons(callback: CallbackQuery):
+async def inline_buttons_handler(callback: CallbackQuery):
     try:
         if callback.data == "navbat":
             await navbat(callback.message)
@@ -337,13 +265,12 @@ async def inline_buttons(callback: CallbackQuery):
         elif callback.data == "tarix":
             await tarix(callback.message)
         
-        # MUHIM: callback.answer() qilish kerak
         await callback.answer()
     except Exception as e:
-        await callback.answer(f"Xatolik: {str(e)}", show_alert=True)
+        await callback.answer(text=f"Xatolik: {str(e)}", show_alert=True)
 
 @dp.message(Command("about"))
-async def about(message: types.Message):
+async def about(message: Message):
     text = """
 🤖 BOT HAQIDA
 
@@ -352,20 +279,20 @@ async def about(message: types.Message):
 ⏰ Eslatmalar yuboradi
 
 👨‍💻 Developer: Shukurullo
-⚙️ Version: 1.3
+⚙️ Version: 1.2
 """
     await message.answer(text)
 
 @dp.message(Command("id"))
-async def get_id(message: types.Message):
+async def get_id(message: Message):
     text = f"""
 🆔 Sizning ID: {message.from_user.id}
 💬 Chat ID: {message.chat.id}
 """
     await message.answer(text)
 
-@dp.message(F.text == "/ping")
-async def ping(message: types.Message):
+@dp.message(Command("ping"))
+async def ping(message: Message):
     text = """
 🏓 BOT STATUS
 
@@ -376,20 +303,18 @@ async def ping(message: types.Message):
     await message.answer(text)
 
 @dp.message(F.text == "📊 Navbat")
-@dp.message(F.text == "/navbat")
-async def navbat(message: types.Message):
+@dp.message(Command("navbat"))
+async def navbat(message: Message):
     await move_past_students_to_history()
     await reset_rotation_if_empty()
     
     student = await get_current_student()
     if not student:
-        await smart_send(message, "Ro’yxat bo‘sh.", 180)
+        await smart_send(message, "Ro'yxat bo'sh.", 180)
         return
 
-    months = [
-        "yanvar","fevral","mart","aprel","may","iyun",
-        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
-    ]
+    months = ["yanvar","fevral","mart","aprel","may","iyun",
+              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
     today = datetime.now(UZ_TZ).date()
     next_date = student["shanbalik_date"]
     days_left = (next_date - today).days
@@ -406,20 +331,18 @@ async def navbat(message: types.Message):
     await smart_send(message, f"<pre>{text}</pre>", 180)
 
 @dp.message(F.text == "📋 Ro‘yxat")
-@dp.message(F.text == "/royxat")
-async def royxat(message: types.Message):
+@dp.message(Command("royxat"))
+async def royxat(message: Message):
     async with db_pool.acquire() as conn:
         rows = await conn.fetch("SELECT name, shanbalik_date FROM students ORDER BY position")
 
     if not rows:
-        await smart_send(message, "Ro‘yxat bo‘sh.", 300)
+        await smart_send(message, "Ro'yxat bo'sh.", 300)
         return
 
-    text = "━━━━━━━━━━━━━━━━━━\n📋 RO‘YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
-    months = [
-        "yanvar","fevral","mart","aprel","may","iyun",
-        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
-    ]
+    text = "━━━━━━━━━━━━━━━━━━\n📋 RO'YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
+    months = ["yanvar","fevral","mart","aprel","may","iyun",
+              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
 
     for i, r in enumerate(rows, start=1):
         date = r["shanbalik_date"]
@@ -430,22 +353,20 @@ async def royxat(message: types.Message):
     await smart_send(message, f"<pre>{text}</pre>", 300)
 
 @dp.message(F.text == "📜 Tarix")
-@dp.message(F.text == "/tarix")
-async def tarix(message: types.Message):
+@dp.message(Command("tarix"))
+async def tarix(message: Message):
     async with db_pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT name, shanbalik_date FROM history ORDER BY id ASC LIMIT 10"
         )
 
     if not rows:
-        await smart_send(message, "Tarix bo‘sh.", 300)
+        await smart_send(message, "Tarix bo'sh.", 300)
         return
 
     text = "━━━━━━━━━━━━━━━━━━\n📜 TARIX\n━━━━━━━━━━━━━━━━━━\n\n"
-    months = [
-        "yanvar","fevral","mart","aprel","may","iyun",
-        "iyul","avgust","sentabr","oktabr","noyabr","dekabr"
-    ]
+    months = ["yanvar","fevral","mart","aprel","may","iyun",
+              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
 
     for i, r in enumerate(rows, start=1):
         date = r["shanbalik_date"]
@@ -456,7 +377,7 @@ async def tarix(message: types.Message):
     await smart_send(message, f"<pre>{text}</pre>", 300)
 
 @dp.message(F.text == "➕ O‘quvchi qo‘shish")
-async def ask_student(message: types.Message):
+async def ask_student(message: Message):
     if message.from_user.id not in ADMIN_IDS:
         return
     await message.answer("Ismini yuboring (private tavsiya qilinadi):")
@@ -465,82 +386,87 @@ async def ask_student(message: types.Message):
     F.chat.type == "private",
     F.text,
     ~F.text.startswith("/"),
-    ~F.text.in_([
-        "📊 Navbat",
-        "📋 Ro‘yxat",
-        "📜 Tarix",
-        "➕ O‘quvchi qo‘shish"
-    ])
+    ~F.text.in_(["📊 Navbat", "📋 Ro‘yxat", "📜 Tarix", "➕ O‘quvchi qo‘shish"])
 )
-async def catch_private(message: types.Message):
-    # 🎂 Birthday
+async def catch_private(message: Message):
+    # Tug'ilgan kun saqlash
     try:
         birth_date = datetime.strptime(message.text, "%Y-%m-%d").date()
         async with db_pool.acquire() as conn:
             await conn.execute("""
-                INSERT INTO birthdays (user_id,name,birth_date)
-                VALUES ($1,$2,$3)
-                ON CONFLICT DO NOTHING
-            """,
-            message.from_user.id,
-            message.from_user.full_name,
-            birth_date)
-        await message.answer("🎂 Tug‘ilgan kun saqlandi!")
+                INSERT INTO birthdays (user_id, name, birth_date)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (user_id) DO NOTHING
+            """, message.from_user.id, message.from_user.full_name, birth_date)
+        await message.answer("🎂 Tug'ilgan kun saqlandi!")
         return
     except:
         pass
 
-    # ➕ Add student
+    # O'quvchi qo'shish
     if message.from_user.id in ADMIN_IDS:
         async with db_pool.acquire() as conn:
             count = await conn.fetchval("SELECT COUNT(*) FROM students")
             today = datetime.now(UZ_TZ).date()
             next_date = today + timedelta(days=count)
             await conn.execute(
-                """INSERT INTO students (name, position, shanbalik_date)
-                   VALUES ($1,$2,$3)
-                   ON CONFLICT (name) DO NOTHING""",
-                message.text,
-                count + 1,
-                next_date
+                "INSERT INTO students (name, position, shanbalik_date) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING",
+                message.text, count + 1, next_date
             )
-        await message.answer("✅ Qo‘shildi")
+        await message.answer("✅ Qo'shildi")
 
 # ================= STARTUP =================
-
 @app.on_event("startup")
 async def startup():
     global db_pool
     
-    await set_commands(bot)
+    # Komandalarni o'rnatish
+    commands = [
+        BotCommand(command="start", description="Botni ishga tushirish"),
+        BotCommand(command="navbat", description="Hozirgi navbat"),
+        BotCommand(command="royxat", description="Ro'yxat"),
+        BotCommand(command="tarix", description="Tarix"),
+        BotCommand(command="about", description="Bot haqida"),
+        BotCommand(command="id", description="ID ni ko'rish"),
+        BotCommand(command="ping", description="Bot holati")
+    ]
+    await bot.set_my_commands(commands)
+    
+    # Database
     db_pool = await asyncpg.create_pool(DATABASE_URL)
     await init_db()
     
-    # Webhook sozlamalari
+    # Webhook
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_webhook(WEBHOOK_URL)
     
-    # Scheduler
+    # SCHEDULER (AVTOMATIK ESLATMALAR)
     scheduler.add_job(monthly_reminder, "cron", day=1, hour=9, minute=0)
     scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
     scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
     scheduler.start()
+    
+    print("✅ Bot ishga tushdi! AIogram 3.4.1")
 
 # ================= WEBHOOK =================
-
 @app.post("/webhook")
 async def webhook(request: Request):
     try:
         data = await request.json()
         update = types.Update(**data)
-        await dp.feed_update(bot, update)
+        await dp.feed_update(bot=bot, update=update)
         return JSONResponse({"ok": True})
     except Exception as e:
-        print(f"Webhook error: {e}")
+        print(f"Webhook xatolik: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
-# ================= RUN =================
+@app.on_event("shutdown")
+async def shutdown():
+    await bot.session.close()
+    if db_pool:
+        await db_pool.close()
 
+# ================= RUN =================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
