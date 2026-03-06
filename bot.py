@@ -418,7 +418,7 @@ async def about(message: Message):
 ⏰ Eslatmalar yuboradi
 
 👨‍💻 Developer: Shukurullo
-⚙️ Version: 1.3
+⚙️ Version: 1.4
 """
     await message.answer(text)
 
