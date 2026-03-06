@@ -113,7 +113,6 @@ def user_keyboard():
         resize_keyboard=True
     )
 
-
 # ================= UTIL =================
 
 async def move_past_students_to_history():
@@ -262,8 +261,6 @@ async def today_reminder():
     
 #================JUMA TABRIK================
 
-import random
-
 RAMAZON_START = datetime(2026, 2, 18).date()
 RAMAZON_END = datetime(2026, 3, 19).date()
 
@@ -326,8 +323,6 @@ async def friday_greeting():
         text = random.choice(normal_friday_messages)
 
     await bot.send_message(GROUP_ID, text)
-
-async def set_commands(bot):
 
     commands = [
         BotCommand(command="navbat", description="Navbatni ko‘rish"),
@@ -404,15 +399,25 @@ System Status: 🟢 Active
 """
 
     if message.chat.type == "private":
-        await message.answer(
-            text,
-            reply_markup=admin_keyboard() if is_admin else group_keyboard
-            )
-    else:
-        await message.answer(
-            text,
-            reply_markup=group_keyboard
-        )
+    await message.answer(
+        text,
+        reply_markup=admin_keyboard() if is_admin else group_keyboard()
+    )
+#============= Callback handler============
+
+@dp.callback_query()
+async def inline_buttons(callback: CallbackQuery):
+
+    if callback.data == "navbat":
+        await navbat(callback.message)
+
+    elif callback.data == "royxat":
+        await royxat_handler(callback.message)
+
+    elif callback.data == "tarix":
+        await tarix_handler(callback.message)
+
+    await callback.answer()
 # ================= ABOUT =================
 
 @dp.message(Command("about"))
@@ -426,7 +431,7 @@ async def about(message: types.Message):
 ⏰ Eslatmalar yuboradi
 
 👨‍💻 Developer: Shukurullo
-⚙️ Version: 1.1
+⚙️ Version: 1.2
 """
 
     await message.answer(text)
@@ -649,22 +654,6 @@ async def startup():
     
     scheduler.start()
 
-#=================main.py===================
-    
-@dp.callback_query()
-async def inline_buttons(callback: CallbackQuery):
-
-    if callback.data == "navbat":
-        await callback.message.answer("📅 Bugungi navbatchi: ...")
-
-    elif callback.data == "royxat":
-        await callback.message.answer("📋 Talabalar ro'yxati")
-
-    elif callback.data == "tarix":
-        await callback.message.answer("📚 Navbatchilik tarixi")
-
-    await callback.answer()
-    
 # ================= WEBHOOK =================
 
 @app.post("/webhook")
