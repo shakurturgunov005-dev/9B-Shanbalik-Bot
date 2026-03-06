@@ -3,6 +3,7 @@ import os
 import asyncpg
 import pytz
 import random
+from aiogram.types import ReplyKeyboardRemove  # clear_handler uchun
 from datetime import datetime, timedelta
 from urllib.parse import urlparse  # BU QATOR MUHIM!
 
@@ -72,11 +73,13 @@ def admin_keyboard():
             [KeyboardButton(text="📊 Navbat")],
             [KeyboardButton(text="📋 Ro‘yxat")],
             [KeyboardButton(text="📜 Tarix")],
-            [KeyboardButton(text="➕ O‘quvchi qo‘shish")]
+            [KeyboardButton(text="➕ O‘quvchi qo‘shish")],
+            [KeyboardButton(text="➖ O‘quvchi o‘chirish")],  # Yangi
+            [KeyboardButton(text="🗑 Tarixni tozalash")],    # Yangi
+            [KeyboardButton(text="📊 O‘quvchilar soni")]     # Yangi
         ],
         resize_keyboard=True
     )
-
 def user_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📊 Navbat")]],
@@ -268,13 +271,133 @@ System Status: 🟢 Active
             reply_markup=admin_keyboard() if is_admin else user_keyboard()
         )
     else:
-        # GURUH UCHUN - PASTDAGI TUGMALAR
-        await message.answer(text, reply_markup=group_reply_keyboard)
+        # GURUH UCHUN - PASTDAGI TUGMALAR (120 sekund = 2 minut)
+        await smart_send(message, text, 120)
+        # Tugmalar qolishi uchun alohida xabar
+        await message.answer("📱 Menyu:", reply_markup=group_reply_keyboard)
+        
+# ================= ADMIN HANDLERS =================
 
+@dp.message(F.text == "➖ O‘quvchi o‘chirish")
+async def remove_student(message: Message):
+    """O'quvchini o'chirish"""
+    if message.from_user.id not in ADMIN_IDS:
+        return
+    
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("SELECT id, name FROM students ORDER BY position")
+    
+    if not rows:
+        await message.answer("📭 Ro'yxat bo'sh")
+        return
+    
+    # Inline tugmalar bilan ro'yxat
+    keyboard = []
+    for row in rows:
+        keyboard.append([InlineKeyboardButton(
+            text=f"{row['name']}", 
+            callback_data=f"del_{row['id']}"
+        )])
+    
+    keyboard.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")])
+    
+    await message.answer(
+        "❌ O'chirmoqchi bo'lgan o'quvchini tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+
+@dp.message(F.text == "🗑 Tarixni tozalash")
+async def clear_history(message: Message):
+    """Tarixni tozalash"""
+    if message.from_user.id not in ADMIN_IDS:
+        return
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Ha, tozala", callback_data="clear_history_yes")],
+        [InlineKeyboardButton(text="❌ Yo'q", callback_data="cancel")]
+    ])
+    
+    await message.answer(
+        "🗑 Tarixni tozalashni xohlaysizmi?",
+        reply_markup=keyboard
+    )
+
+@dp.message(F.text == "📊 O‘quvchilar soni")
+async def student_count(message: Message):
+    """O'quvchilar sonini ko'rish"""
+    if message.from_user.id not in ADMIN_IDS:
+        return
+    
+    async with db_pool.acquire() as conn:
+        students = await conn.fetchval("SELECT COUNT(*) FROM students")
+        history = await conn.fetchval("SELECT COUNT(*) FROM history")
+        next_student = await get_current_student()
+    
+    next_name = next_student['name'] if next_student else "Yo'q"
+    
+    await message.answer(f"""
+📊 STATISTIKA
+━━━━━━━━━━━━━━━
+👥 Jami o'quvchilar: {students}
+📜 Tarixda: {history}
+👤 Keyingi navbatchi: {next_name}
+━━━━━━━━━━━━━━━
+""")
+
+@dp.message(Command("clear"))
+async def clear_keyboard(message: Message):
+    """Klaviaturani tozalash"""
+    if message.chat.type == "private":
+        return
+    
+    text = "✅ Klaviatura tozalandi!"
+    await smart_send(message, text, 120)
+    
+    # Klaviaturani o'chirish
+    await message.answer(
+        "Endi tugmalar yo'q",
+        reply_markup=ReplyKeyboardRemove()
+    )
 # CALLBACK HANDLER (INLINE TUGMALAR UCHUN)
 @dp.callback_query()
 async def inline_buttons_handler(callback: CallbackQuery):
     try:
+        # O'quvchini o'chirish
+        if callback.data.startswith("del_"):
+            student_id = int(callback.data.replace("del_", ""))
+            
+            async with db_pool.acquire() as conn:
+                # O'quvchini o'chirish
+                await conn.execute("DELETE FROM students WHERE id = $1", student_id)
+                
+                # Qolganlarning position larini yangilash
+                await conn.execute("""
+                    WITH numbered AS (
+                        SELECT id, ROW_NUMBER() OVER (ORDER BY position) as new_pos
+                        FROM students
+                    )
+                    UPDATE students SET position = numbered.new_pos
+                    FROM numbered WHERE students.id = numbered.id
+                """)
+            
+            await callback.message.edit_text("✅ O'quvchi o'chirildi!")
+            await callback.answer()
+            return
+
+        # Tarixni tozalash
+        elif callback.data == "clear_history_yes":
+            async with db_pool.acquire() as conn:
+                await conn.execute("DELETE FROM history")
+            await callback.message.edit_text("✅ Tarix tozalandi!")
+            await callback.answer()
+            return
+        
+        elif callback.data == "cancel":
+            await callback.message.edit_text("❌ Bekor qilindi")
+            await callback.answer()
+            return
+        
+        # Oddiy tugmalar
         if callback.data == "navbat":
             await navbat(callback.message)
         elif callback.data == "royxat":
@@ -284,9 +407,8 @@ async def inline_buttons_handler(callback: CallbackQuery):
         
         await callback.answer()
     except Exception as e:
-        await callback.answer(text=f"Xatolik: {str(e)}", show_alert=True)
-
-@dp.message(Command("about"))
+        await callback.answer(text=f"Xatolik: {str(e)}", show_alert=True)@dp.message(Command("about"))
+        
 async def about(message: Message):
     text = """
 🤖 BOT HAQIDA
