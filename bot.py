@@ -47,7 +47,17 @@ scheduler = AsyncIOScheduler(timezone=UZ_TZ)
 db_pool = None
 
 # ================= KEYBOARDS =================
-# INLINE KEYBOARD (GURUHLAR UCHUN)
+
+# GURUH UCHUN REPLY KEYBOARD (⬜️ BOSGANDA CHIQADI)
+group_reply_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📊 Navbat"), KeyboardButton(text="📋 Ro‘yxat"), KeyboardButton(text="📜 Tarix")]
+    ],
+    resize_keyboard=True,
+    is_persistent=True
+)
+
+# INLINE KEYBOARD (agar xabar ichida kerak bo'lsa)
 group_inline_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="📅 Navbat", callback_data="navbat")],
@@ -251,14 +261,15 @@ Access Level: {role}
 System Status: 🟢 Active
 ━━━━━━━━━━━━━━━━━━
 """
+    
     if message.chat.type == "private":
         await message.answer(
-            text=text,
+            text,
             reply_markup=admin_keyboard() if is_admin else user_keyboard()
         )
     else:
-        # GURUHLAR UCHUN INLINE TUGMALAR
-        await message.answer(text=text, reply_markup=group_inline_keyboard)
+        # GURUH UCHUN - PASTDAGI TUGMALAR
+        await message.answer(text, reply_markup=group_reply_keyboard)
 
 # CALLBACK HANDLER (INLINE TUGMALAR UCHUN)
 @dp.callback_query()
@@ -285,7 +296,7 @@ async def about(message: Message):
 ⏰ Eslatmalar yuboradi
 
 👨‍💻 Developer: Shukurullo
-⚙️ Version: 1.2
+⚙️ Version: 1.3
 """
     await message.answer(text)
 
@@ -479,6 +490,16 @@ async def startup():
         print(f"❌ Xatolik turi: {type(e)}")
         import traceback
         traceback.print_exc()
+        # Yangi a'zo kirganda hech narsa qilma
+@dp.message()
+async def handle_new_members(message: Message):
+    if message.new_chat_members:
+        # "X guruhga qo'shildi" xabarini o'chirish
+        try:
+            await message.delete()
+        except:
+            pass
+        return
 # ================= WEBHOOK =================
 @app.post("/webhook")
 async def webhook(request: Request):
