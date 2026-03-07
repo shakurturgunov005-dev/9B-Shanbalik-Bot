@@ -412,17 +412,17 @@ async def inline_buttons_handler(callback: CallbackQuery):
 @dp.message(Command("about"))
 async def about(message: Message):
     text = """
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
    🤖 **BOT HAQIDA**    
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 📌 **Shanbalik navbat bot**
 📅 Navbatlarni avtomatik yuritadi
 ⏰ Eslatmalar yuboradi
 
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
    🚀 **TEZ KUNDA** 
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 
 ✨ **AI Integratsiya** 
    [████████▒▒▒▒▒▒] 40%
@@ -431,13 +431,13 @@ async def about(message: Message):
    • 📊 Tahlil tizimi
    • 💬 Muloqot moduli
 
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 👨‍💻 **Developer:** Shukurullo
 📅 **2026**
 ⚙️ **Version: 1.5**
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 """
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
 
 @dp.message(Command("id"))
 async def get_id(message: Message):
