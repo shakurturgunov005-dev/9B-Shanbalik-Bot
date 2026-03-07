@@ -252,7 +252,7 @@ async def friday_greeting():
 async def start_handler(message: Message):
     name = message.from_user.full_name
     is_admin = message.from_user.id in ADMIN_IDS
-    role = "ADMIN 👑" if is_admin else "USER"
+    role = "ADMIN 👑" if is_admin else "USER 👤"
     
     text = f"""
 ━━━━━━━━━━━━━━━━━━
@@ -267,13 +267,12 @@ System Status: 🟢 Active
     
     if message.chat.type == "private":
         await message.answer(
-            text,
+            f"<pre>{text}</pre>",
+            parse_mode="HTML",
             reply_markup=admin_keyboard() if is_admin else user_keyboard()
         )
     else:
-        # GURUH UCHUN - PASTDAGI TUGMALAR (120 sekund = 2 minut)
-        await smart_send(message, text, 120)
-        # Tugmalar qolishi uchun alohida xabar
+        await smart_send(message, f"<pre>{text}</pre>", 120)
         await message.answer("📱 Menyu:", reply_markup=group_reply_keyboard)
         
 # ================= ADMIN HANDLERS =================
@@ -335,14 +334,17 @@ async def student_count(message: Message):
     
     next_name = next_student['name'] if next_student else "Yo'q"
     
-    await message.answer(f"""
+    text = f"""
+━━━━━━━━━━━━━━━━━━
 📊 STATISTIKA
-━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━
+
 👥 Jami o'quvchilar: {students}
 📜 Tarixda: {history}
 👤 Keyingi navbatchi: {next_name}
-━━━━━━━━━━━━━━━
-""")
+━━━━━━━━━━━━━━━━━━
+"""
+    await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
 
 @dp.message(Command("clear"))
 async def clear_keyboard(message: Message):
@@ -442,21 +444,29 @@ async def about(message: Message):
 @dp.message(Command("id"))
 async def get_id(message: Message):
     text = f"""
-🆔 Sizning ID: {message.from_user.id}
+━━━━━━━━━━━━━━━━━━
+🆔 ID MA'LUMOTLARI
+━━━━━━━━━━━━━━━━━━
+
+👤 Sizning ID: {message.from_user.id}
 💬 Chat ID: {message.chat.id}
+━━━━━━━━━━━━━━━━━━
 """
-    await message.answer(text)
+    await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
 
 @dp.message(Command("ping"))
 async def ping(message: Message):
     text = """
+━━━━━━━━━━━━━━━━━━
 🏓 BOT STATUS
+━━━━━━━━━━━━━━━━━━
 
 ⚙️ System: Active
 🤖 Bot: Working
 📡 Connection: OK
+━━━━━━━━━━━━━━━━━━
 """
-    await message.answer(text)
+    await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
 
 @dp.message(F.text == "📊 Navbat")
 @dp.message(Command("navbat"))
