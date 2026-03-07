@@ -3,9 +3,9 @@ import os
 import asyncpg
 import pytz
 import random
-from aiogram.types import ReplyKeyboardRemove  # clear_handler uchun
+from aiogram.types import ReplyKeyboardRemove
 from datetime import datetime, timedelta
-from urllib.parse import urlparse  # BU QATOR MUHIM!
+from urllib.parse import urlparse
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import (
@@ -24,21 +24,18 @@ import uvicorn
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# MUHIM: DATABASE URL NI TO'G'RIDAN-TO'G'RI YOZAMIZ
 DATABASE_URL = "postgresql://postgres:QfIuxRfbwyKyLdrnOiexCsVnVzmneCuY@metro.proxy.rlwy.net:31961/railway"
 
-# Database URL ni tekshirish
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-print(f"📦 Database URL: {DATABASE_URL[:30]}...")  # Logga yozish
+print(f"📦 Database URL: {DATABASE_URL[:30]}...")
 
 GROUP_ID = -1003557503048
 ADMIN_IDS = [6042457335]
 
 UZ_TZ = pytz.timezone("Asia/Tashkent")
 
-# Bot sozlamalari
 storage = MemoryStorage()
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=storage)
@@ -49,16 +46,13 @@ db_pool = None
 
 # ================= KEYBOARDS =================
 
-# GURUH UCHUN REPLY KEYBOARD (⬜️ BOSGANDA CHIQADI)
 group_reply_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📊 Navbat"), KeyboardButton(text="📋 Ro‘yxat"), KeyboardButton(text="📜 Tarix")]
     ],
     resize_keyboard=True,
-
 )
 
-# INLINE KEYBOARD (agar xabar ichida kerak bo'lsa)
 group_inline_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="📅 Navbat", callback_data="navbat")],
@@ -74,12 +68,13 @@ def admin_keyboard():
             [KeyboardButton(text="📋 Ro‘yxat")],
             [KeyboardButton(text="📜 Tarix")],
             [KeyboardButton(text="➕ O‘quvchi qo‘shish")],
-            [KeyboardButton(text="➖ O‘quvchi o‘chirish")],  # Yangi
-            [KeyboardButton(text="🗑 Tarixni tozalash")],    # Yangi
-            [KeyboardButton(text="📊 O‘quvchilar soni")]     # Yangi
+            [KeyboardButton(text="➖ O‘quvchi o‘chirish")],
+            [KeyboardButton(text="🗑 Tarixni tozalash")],
+            [KeyboardButton(text="📊 O‘quvchilar soni")]
         ],
         resize_keyboard=True
     )
+
 def user_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📊 Navbat")]],
@@ -100,7 +95,7 @@ async def smart_send(message: Message, text: str, seconds: int):
         asyncio.create_task(auto_delete(sent, seconds))
         asyncio.create_task(auto_delete(message, seconds))
     return sent
-    
+
 # ================= DATABASE =================
 async def init_db():
     async with db_pool.acquire() as conn:
@@ -119,15 +114,6 @@ async def init_db():
             name TEXT NOT NULL,
             shanbalik_date DATE NOT NULL,
             completed_at TIMESTAMP DEFAULT NOW()
-        )
-        """)
-
-        await conn.execute("""
-        CREATE TABLE IF NOT EXISTS birthdays (
-            id SERIAL PRIMARY KEY,
-            user_id BIGINT UNIQUE,
-            name TEXT,
-            birth_date DATE
         )
         """)
 
@@ -180,28 +166,27 @@ async def reset_rotation_if_empty():
             await conn.execute("DELETE FROM history")
 
 # ================= REMINDER FUNCTIONS =================
-async def monthly_reminder():
+async def one_day_before_reminder():
+    """Ertaga navbatchi bo'lsa, 1 kun qolganligi haqida eslatma"""
     student = await get_current_student()
     if not student:
         return
+
     today = datetime.now(UZ_TZ).date()
     shanbalik_date = student["shanbalik_date"]
-    if (shanbalik_date - today).days != 3:
-        return
-    
-    months = ["yanvar","fevral","mart","aprel","may","iyun",
-              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
-    formatted_date = f"{shanbalik_date.day}-{months[shanbalik_date.month-1]} {shanbalik_date.year}"
-    
-    text = f"""
-📢 Eslatma
 
-Yaqinlashayotgan shanbalik navbati:
+    if (shanbalik_date - today).days == 1:
+        months = ["yanvar","fevral","mart","aprel","may","iyun",
+                  "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
+        formatted_date = f"{shanbalik_date.day}-{months[shanbalik_date.month-1]} {shanbalik_date.year}"
 
+        text = f"""
+📢 Eslatma! 1 kun qoldi
+Ertaga shanbalik:
 👤 {student['name']}
 📅 {formatted_date}
 """
-    await bot.send_message(chat_id=GROUP_ID, text=text)
+        await bot.send_message(chat_id=GROUP_ID, text=text)
 
 async def today_reminder():
     student = await get_current_student()
@@ -210,14 +195,13 @@ async def today_reminder():
     today = datetime.now(UZ_TZ).date()
     if student["shanbalik_date"] != today:
         return
-    
+
     months = ["yanvar","fevral","mart","aprel","may","iyun",
               "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
     formatted_date = f"{today.day}-{months[today.month-1]} {today.year}"
-    
-    text = f"""
-📢 Bugun shanbalik
 
+    text = f"""
+📢 Bugun shanbalik:
 👤 {student['name']}
 📅 {formatted_date}
 """
@@ -253,7 +237,7 @@ async def start_handler(message: Message):
     name = message.from_user.full_name
     is_admin = message.from_user.id in ADMIN_IDS
     role = "ADMIN 👑" if is_admin else "USER 👤"
-    
+
     text = f"""
 ━━━━━━━━━━━━━━━━━━
 📊 SHANBALIK 2026
@@ -264,7 +248,7 @@ Access Level: {role}
 System Status: 🟢 Active
 ━━━━━━━━━━━━━━━━━━
 """
-    
+
     if message.chat.type == "private":
         await message.answer(
             f"<pre>{text}</pre>",
@@ -274,32 +258,30 @@ System Status: 🟢 Active
     else:
         await smart_send(message, f"<pre>{text}</pre>", 120)
         await message.answer("📱 Menyu:", reply_markup=group_reply_keyboard)
-        
+
 # ================= ADMIN HANDLERS =================
 
 @dp.message(F.text == "➖ O‘quvchi o‘chirish")
 async def remove_student(message: Message):
-    """O'quvchini o'chirish"""
     if message.from_user.id not in ADMIN_IDS:
         return
-    
+
     async with db_pool.acquire() as conn:
         rows = await conn.fetch("SELECT id, name FROM students ORDER BY position")
-    
+
     if not rows:
         await message.answer("📭 Ro'yxat bo'sh")
         return
-    
-    # Inline tugmalar bilan ro'yxat
+
     keyboard = []
     for row in rows:
         keyboard.append([InlineKeyboardButton(
-            text=f"{row['name']}", 
+            text=f"{row['name']}",
             callback_data=f"del_{row['id']}"
         )])
-    
+
     keyboard.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel")])
-    
+
     await message.answer(
         "❌ O'chirmoqchi bo'lgan o'quvchini tanlang:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
@@ -307,15 +289,14 @@ async def remove_student(message: Message):
 
 @dp.message(F.text == "🗑 Tarixni tozalash")
 async def clear_history(message: Message):
-    """Tarixni tozalash"""
     if message.from_user.id not in ADMIN_IDS:
         return
-    
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Ha, tozala", callback_data="clear_history_yes")],
         [InlineKeyboardButton(text="❌ Yo'q", callback_data="cancel")]
     ])
-    
+
     await message.answer(
         "🗑 Tarixni tozalashni xohlaysizmi?",
         reply_markup=keyboard
@@ -323,17 +304,16 @@ async def clear_history(message: Message):
 
 @dp.message(F.text == "📊 O‘quvchilar soni")
 async def student_count(message: Message):
-    """O'quvchilar sonini ko'rish"""
     if message.from_user.id not in ADMIN_IDS:
         return
-    
+
     async with db_pool.acquire() as conn:
         students = await conn.fetchval("SELECT COUNT(*) FROM students")
         history = await conn.fetchval("SELECT COUNT(*) FROM history")
         next_student = await get_current_student()
-    
+
     next_name = next_student['name'] if next_student else "Yo'q"
-    
+
     text = f"""
 ━━━━━━━━━━━━━━━━━━
 📊 STATISTIKA
@@ -348,31 +328,22 @@ async def student_count(message: Message):
 
 @dp.message(Command("clear"))
 async def clear_keyboard(message: Message):
-    """Klaviaturani tozalash"""
     if message.chat.type == "private":
         return
-    
+
     text = "✅ Klaviatura tozalandi!"
     await smart_send(message, text, 120)
-    
-    # Klaviaturani o'chirish
-    await message.answer(
-        "Endi tugmalar yo'q",
-        reply_markup=ReplyKeyboardRemove()
-    )
-# CALLBACK HANDLER (INLINE TUGMALAR UCHUN)
+    await message.answer("Endi tugmalar yo'q", reply_markup=ReplyKeyboardRemove())
+
+# ================= CALLBACK HANDLER =================
 @dp.callback_query()
 async def inline_buttons_handler(callback: CallbackQuery):
     try:
-        # O'quvchini o'chirish
         if callback.data.startswith("del_"):
             student_id = int(callback.data.replace("del_", ""))
-            
+
             async with db_pool.acquire() as conn:
-                # O'quvchini o'chirish
                 await conn.execute("DELETE FROM students WHERE id = $1", student_id)
-                
-                # Qolganlarning position larini yangilash
                 await conn.execute("""
                     WITH numbered AS (
                         SELECT id, ROW_NUMBER() OVER (ORDER BY position) as new_pos
@@ -381,36 +352,34 @@ async def inline_buttons_handler(callback: CallbackQuery):
                     UPDATE students SET position = numbered.new_pos
                     FROM numbered WHERE students.id = numbered.id
                 """)
-            
+
             await callback.message.edit_text("✅ O'quvchi o'chirildi!")
             await callback.answer()
             return
 
-        # Tarixni tozalash
         elif callback.data == "clear_history_yes":
             async with db_pool.acquire() as conn:
                 await conn.execute("DELETE FROM history")
             await callback.message.edit_text("✅ Tarix tozalandi!")
             await callback.answer()
             return
-        
+
         elif callback.data == "cancel":
             await callback.message.edit_text("❌ Bekor qilindi")
             await callback.answer()
             return
-        
-        # Oddiy tugmalar
+
         if callback.data == "navbat":
             await navbat(callback.message)
         elif callback.data == "royxat":
             await royxat(callback.message)
         elif callback.data == "tarix":
             await tarix(callback.message)
-        
+
         await callback.answer()
     except Exception as e:
         await callback.answer(text=f"Xatolik: {str(e)}", show_alert=True)
-        
+
 @dp.message(Command("about"))
 async def about(message: Message):
     text = """
@@ -473,7 +442,7 @@ async def ping(message: Message):
 async def navbat(message: Message):
     await move_past_students_to_history()
     await reset_rotation_if_empty()
-    
+
     student = await get_current_student()
     if not student:
         await smart_send(message, "Ro'yxat bo'sh.", 180)
@@ -566,13 +535,13 @@ async def catch_private(message: Message):
                 message.text, count + 1, next_date
             )
         await message.answer("✅ Qo'shildi")
+
 # ================= STARTUP =================
 @app.on_event("startup")
 async def startup():
     global db_pool
-    
+
     try:
-        # Komandalarni o'rnatish
         commands = [
             BotCommand(command="start", description="Botni ishga tushirish"),
             BotCommand(command="navbat", description="Hozirgi navbat"),
@@ -583,11 +552,9 @@ async def startup():
             BotCommand(command="ping", description="Bot holati")
         ]
         await bot.set_my_commands(commands)
-        
-        # Database ulanishi
+
         print(f"🔄 Database ga ulanish: {DATABASE_URL[:50]}...")
-        
-        # Maxsus parametrlar bilan ulanish
+
         db_pool = await asyncpg.create_pool(
             DATABASE_URL,
             min_size=1,
@@ -596,44 +563,42 @@ async def startup():
             max_queries=50000,
             max_inactive_connection_lifetime=300
         )
-        
-        # Test query
+
         async with db_pool.acquire() as conn:
             await conn.execute("SELECT 1")
             print("✅ Database test query muvaffaqiyatli!")
-        
+
         await init_db()
         print("✅ Database jadvallari yaratildi!")
-        
-        # Webhook
+
         await bot.delete_webhook(drop_pending_updates=True)
         await bot.set_webhook(WEBHOOK_URL)
         print(f"✅ Webhook sozlandi: {WEBHOOK_URL}")
-        
+
         # SCHEDULER (AVTOMATIK ESLATMALAR)
-        scheduler.add_job(monthly_reminder, "cron", day=1, hour=9, minute=0)
-        scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
+        scheduler.add_job(today_reminder, "cron", hour=7, minute=0)           # bugun navbatchi
+        scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)  # 1 kun qolganda
         scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        
+
         print("✅ Bot ishga tushdi! AIogram 3.4.1")
-        
+
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
         print(f"❌ Xatolik turi: {type(e)}")
         import traceback
         traceback.print_exc()
-        # Yangi a'zo kirganda hech narsa qilma
+
 @dp.message()
 async def handle_new_members(message: Message):
     if message.new_chat_members:
-        # "X guruhga qo'shildi" xabarini o'chirish
         try:
             await message.delete()
         except:
             pass
         return
+
 # ================= WEBHOOK =================
 @app.post("/webhook")
 async def webhook(request: Request):
