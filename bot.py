@@ -23,8 +23,7 @@ import uvicorn
 # ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-DATABASE_URL = "postgresql://postgres:QfIuxRfbwyKyLdrnOiexCsVnVzmneCuY@metro.proxy.rlwy.net:31961/railway"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
