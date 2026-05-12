@@ -43,8 +43,8 @@ scheduler = AsyncIOScheduler(timezone=UZ_TZ)
 
 db_pool = None
 
-MONTHS = ["yanvar","fevral","mart","aprel","may","iyun",
-          "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
+MONTHS = ["yanvar ","fevral ","mart   ","aprel  ","may    ","iyun   ",
+          "iyul   ","avgust ","sentabr","oktabr ","noyabr ","dekabr "]
 
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
@@ -106,7 +106,9 @@ async def init_db():
 
 # ================= UTIL FUNCTIONS =================
 def format_date(date):
-    return f"{date.day}-{MONTHS[date.month-1]} {date.year}"
+    day = str(date.day).zfill(2)
+    month = MONTHS[date.month - 1]
+    return f"{day}-{month} {date.year}"
 
 async def move_past_students_to_history():
     async with db_pool.acquire() as conn:
@@ -185,7 +187,7 @@ async def get_royxat_text():
         return "📭 Ro'yxat bo'sh."
     text = "━━━━━━━━━━━━━━━━━━\n📋 RO'YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
     for i, r in enumerate(rows, start=1):
-        name = r['name'][:16].ljust(16)
+        name = r['name'][:14].ljust(14)
         date = format_date(r['shanbalik_date'])
         text += f"{i:>2}. {name} {date}\n"
     text += "\n━━━━━━━━━━━━━━━━━━"
@@ -198,7 +200,7 @@ async def get_tarix_text():
         return "📭 Tarix bo'sh."
     text = "━━━━━━━━━━━━━━━━━━\n📜 TARIX\n━━━━━━━━━━━━━━━━━━\n\n"
     for i, r in enumerate(rows, start=1):
-        name = r['name'][:16].ljust(16)
+        name = r['name'][:14].ljust(14)
         date = format_date(r['shanbalik_date'])
         text += f"{i:>2}. {name} {date}\n"
     text += "\n━━━━━━━━━━━━━━━━━━"
@@ -210,6 +212,7 @@ async def start_handler(message: Message, state: FSMContext):
     await state.clear()
     is_admin = message.from_user.id in ADMIN_IDS
     text = get_main_text(message.from_user.full_name, is_admin)
+    await message.answer("✅", reply_markup=ReplyKeyboardRemove())
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML",
                          reply_markup=main_menu_keyboard(is_admin))
 
@@ -649,7 +652,7 @@ async def startup():
         scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 2.0")
+        print("✅ Bot ishga tushdi! Version 5.0")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
