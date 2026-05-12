@@ -185,7 +185,9 @@ async def get_royxat_text():
         return "📭 Ro'yxat bo'sh."
     text = "━━━━━━━━━━━━━━━━━━\n📋 RO'YXAT\n━━━━━━━━━━━━━━━━━━\n\n"
     for i, r in enumerate(rows, start=1):
-        text += f"{i}. {r['name']} — {format_date(r['shanbalik_date'])}\n"
+        name = r['name'][:16].ljust(16)
+        date = format_date(r['shanbalik_date'])
+        text += f"{i:>2}. {name} {date}\n"
     text += "\n━━━━━━━━━━━━━━━━━━"
     return text
 
@@ -196,7 +198,9 @@ async def get_tarix_text():
         return "📭 Tarix bo'sh."
     text = "━━━━━━━━━━━━━━━━━━\n📜 TARIX\n━━━━━━━━━━━━━━━━━━\n\n"
     for i, r in enumerate(rows, start=1):
-        text += f"{i}. {r['name']} — {format_date(r['shanbalik_date'])}\n"
+        name = r['name'][:16].ljust(16)
+        date = format_date(r['shanbalik_date'])
+        text += f"{i:>2}. {name} {date}\n"
     text += "\n━━━━━━━━━━━━━━━━━━"
     return text
 
@@ -245,7 +249,7 @@ async def about(message: Message):
         "⏰ Eslatmalar yuboradi\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 2.0\n"
+        "⚙️ Version: 5.0\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
