@@ -776,7 +776,7 @@ async def startup():
         scheduler.add_job(morning_weather, "cron", hour=6, minute=0)
         scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)
-        scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
+        #scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
         print("✅ Bot ishga tushdi! Version 6.1")
