@@ -3,6 +3,7 @@ import os
 import asyncpg
 import pytz
 import random
+import aiohttp
 from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, types, F
@@ -24,6 +25,7 @@ import uvicorn
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -45,6 +47,119 @@ db_pool = None
 
 MONTHS = ["yanvar ","fevral ","mart   ","aprel  ","may    ","iyun   ",
           "iyul   ","avgust ","sentabr","oktabr ","noyabr ","dekabr "]
+
+# ================= TILAKLAR =================
+morning_wishes = [
+    "☀️ Bugun ajoyib kun bo'lsin! Har bir daqiqangiz qimmatli — undan to'g'ri foydalaning!",
+    "🌅 Yangi kun — yangi imkoniyat! Bugun kechagidan yaxshiroq bo'ling!",
+    "💪 Bugungi kun sizniki! Maqsadlaringizga qadam tashlang!",
+    "🌸 Ilm izlash — eng sharafli yo'l. Bugun ham ko'p o'rganing!",
+    "✨ Har ertalab yangi hayot boshlanadi. Bugunni qadrlang!",
+    "🎯 Kichik qadamlar katta maqsadlarga olib boradi. Bugun ham harakat qiling!",
+    "🌟 Sabr va mehnat hech narsani yengolmaydi. Bugun ham sabrli bo'ling!",
+    "📚 Bilim — eng katta boylik. Bugun ham biror yangi narsa o'rganing!",
+    "🤲 Alloh barchangizga bugungi kunni muborak qilsin!",
+    "🌈 Optimizm bilan boshlangan kun doim yaxshi tugaydi!",
+    "⭐ Bugun imtihon, vazifa yoki mashg'ulot bo'lsa — qo'lingizdan keladi!",
+    "🏆 G'alaba — harakat qilganlarnikida. Bugun ham harakat qiling!",
+]
+
+# ================= OB-HAVO EMOJI =================
+def get_weather_emoji(description):
+    desc = description.lower()
+    if "clear" in desc:
+        return "☀️"
+    elif "cloud" in desc:
+        return "⛅"
+    elif "rain" in desc:
+        return "🌧️"
+    elif "snow" in desc:
+        return "❄️"
+    elif "thunder" in desc:
+        return "⛈️"
+    elif "mist" in desc or "fog" in desc or "haze" in desc:
+        return "🌫️"
+    elif "wind" in desc:
+        return "💨"
+    else:
+        return "🌤️"
+
+def get_wind_direction(deg):
+    directions = ["Shimol", "Shimol-Sharq", "Sharq", "Janub-Sharq",
+                  "Janub", "Janub-G'arb", "G'arb", "Shimol-G'arb"]
+    idx = round(deg / 45) % 8
+    return directions[idx]
+
+# ================= OB-HAVO FUNKSIYASI =================
+async def morning_weather():
+    try:
+        url = (
+            f"https://api.openweathermap.org/data/2.5/weather"
+            f"?q=Namangan,UZ"
+            f"&appid={WEATHER_API_KEY}"
+            f"&units=metric"
+            f"&lang=en"
+        )
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                data = await resp.json()
+
+        temp = round(data["main"]["temp"])
+        feels_like = round(data["main"]["feels_like"])
+        humidity = data["main"]["humidity"]
+        wind_speed = round(data["wind"]["speed"])
+        wind_deg = data["wind"].get("deg", 0)
+        description = data["weather"][0]["description"]
+        emoji = get_weather_emoji(description)
+        wind_dir = get_wind_direction(wind_deg)
+
+        # Ob-havo tavsifi uzbekcha
+        desc_map = {
+            "clear sky": "Ochiq osmon",
+            "few clouds": "Ozgina bulut",
+            "scattered clouds": "Bulutli",
+            "broken clouds": "Ko'p bulutli",
+            "overcast clouds": "Quyuq bulutli",
+            "light rain": "Yengil yomg'ir",
+            "moderate rain": "O'rtacha yomg'ir",
+            "heavy intensity rain": "Kuchli yomg'ir",
+            "thunderstorm": "Momaqaldiroq",
+            "snow": "Qor",
+            "mist": "Tuman",
+            "fog": "Qalin tuman",
+            "haze": "Tutun",
+        }
+        desc_uz = desc_map.get(description, description.capitalize())
+
+        wish = random.choice(morning_wishes)
+        today = datetime.now(UZ_TZ)
+
+        text = (
+            f"🌅 Xayrli tong, 9B sinfi!\n"
+            f"📅 {today.strftime('%d.%m.%Y')} | {today.strftime('%H:%M')}\n\n"
+            f"🏙 Namangan ob-havosi:\n"
+            f"{'━'*20}\n"
+            f"{emoji} {desc_uz}\n"
+            f"🌡 Harorat: {temp}°C (his: {feels_like}°C)\n"
+            f"💧 Namlik: {humidity}%\n"
+            f"💨 Shamol: {wind_speed} m/s, {wind_dir}\n"
+            f"{'━'*20}\n\n"
+            f"{wish}"
+        )
+
+        await bot.send_message(chat_id=GROUP_ID, text=text)
+
+    except Exception as e:
+        print(f"❌ Ob-havo xatolik: {e}")
+        # Ob-havo olmasa ham tilak yuboramiz
+        today = datetime.now(UZ_TZ)
+        wish = random.choice(morning_wishes)
+        text = (
+            f"🌅 Xayrli tong, 9B sinfi!\n"
+            f"📅 {today.strftime('%d.%m.%Y')}\n\n"
+            f"{wish}"
+        )
+        await bot.send_message(chat_id=GROUP_ID, text=text)
 
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
@@ -249,10 +364,11 @@ async def about(message: Message):
         "━━━━━━━━━━━━━━━━━━\n\n"
         "📌 Shanbalik navbat bot\n"
         "📅 Navbatlarni avtomatik yuritadi\n"
-        "⏰ Eslatmalar yuboradi\n\n"
+        "⏰ Eslatmalar yuboradi\n"
+        "🌤 Har kuni ob-havo ma'lumoti\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 5.0\n"
+        "⚙️ Version: 6.0\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -647,12 +763,13 @@ async def startup():
         await bot.set_webhook(WEBHOOK_URL)
         print(f"✅ Webhook sozlandi: {WEBHOOK_URL}")
 
+        scheduler.add_job(morning_weather, "cron", hour=6, minute=0)
         scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)
         scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 5.0")
+        print("✅ Bot ishga tushdi! Version 6.0")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
