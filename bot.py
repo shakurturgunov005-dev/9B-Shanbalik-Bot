@@ -345,11 +345,14 @@ async def start_handler(message: Message, state: FSMContext):
 async def ping(message: Message):
     text = (
         "━━━━━━━━━━━━━━━━━━\n"
-        "🏓 BOT STATUS\n"
+        "🟢 SYSTEM STATUS\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "⚙️ System: Active\n"
-        "🤖 Bot: Working\n"
-        "📡 Connection: OK\n"
+        "🤖 Bot: Online\n"
+        "📡 Webhook: Active\n"
+        "🗄 Database: Connected"
+        "⏰ Scheduler: Running"
+        "☁️ Server: Render Cloud"
+        "🚀 Uptime: 24/7"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -372,13 +375,15 @@ async def about(message: Message):
         "━━━━━━━━━━━━━━━━━━\n"
         "🤖 BOT HAQIDA\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "📌 Shanbalik navbat bot\n"
+        "⚡ SHANBALIK MANAGEMENT BOT\n"
         "📅 Navbatlarni avtomatik yuritadi\n"
         "⏰ Eslatmalar yuboradi\n"
-        "🌤 Har kuni ob-havo ma'lumoti\n\n"
+        "🌤 Har kuni ob-havo ma'lumoti\n"
+        "🚀 24/7 Live system\n"
+        "🤖 Powered by Aiogram & FastAPI\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 6.1\n"
+        "⚙️ Version: 6.2\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -779,7 +784,7 @@ async def startup():
         #scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 6.1")
+        print("✅ Bot ishga tushdi! Version 6.2")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
