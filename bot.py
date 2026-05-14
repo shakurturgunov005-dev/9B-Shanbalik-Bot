@@ -48,23 +48,46 @@ db_pool = None
 MONTHS = ["yanvar ","fevral ","mart   ","aprel  ","may    ","iyun   ",
           "iyul   ","avgust ","sentabr","oktabr ","noyabr ","dekabr "]
 
-# ================= TILAKLAR =================
+# ================= ISLOMIY TILAKLAR =================
 morning_wishes = [
     "🤲 Alloh barchangizga bugungi kunni muborak va barakali qilsin!",
     "☀️ Bismillah bilan boshlangan kun doim xayrli bo'ladi!",
     "📿 Har kuni Allohni zikr qiling — qalblar faqat Allohni zikr qilish bilan xotirjam bo'ladi!",
     "🌿 Bugun ham solih amal qiling — har bir yaxshi ish sadaqadir!",
     "🤲 Alloh ilmingizni, axloqingizni va imoningizni ziyoda qilsin!",
-    "☀️ Sabahul xayr! Bugungi kunni ibodат va ilm bilan bezang!",
+    "☀️ Sabahul xayr! Bugungi kunni ibodat va ilm bilan bezang!",
     "🕌 Namozni o'z vaqtida o'qing — u eng yaxshi amallardan biridir!",
     "📚 Ilm izlash — har bir musulmonga farzdir. Bugun ham o'rganing!",
     "🌸 Alloh sizga sabr, shukr va sog'liq bersin!",
     "⭐ Ota-onangizga mehr ko'rsating — bu eng afzal ibodatlardan biridir!",
     "🤲 Tong namozini o'qib, kunni xayrli boshlang!",
-    "🌙 Alloh barchangizni dunyо va oxiratda baxtli qilsin!",
+    "🌙 Alloh barchangizni dunyo va oxiratda baxtli qilsin!",
+    "🕊️ Yaxshi so'z — sadaqa. Bugun ham yaxshi so'zlang!",
+    "🌺 Alloh qilgan yaxshi ishlaringizni qabul qilsin!",
+    "📖 Qur'on tilovat qiling — u qalbga shifodur!",
+    "🤝 Kishilarga yordam bering — bu ibodatning eng go'zal shaklidir!",
+    "🌟 Sabr qiling — Alloh sabr qiluvchilar bilan birgadir!",
+    "🕌 Bugungi kunni duo bilan boshlang — Alloh duolaringizni qabul qilsin!",
 ]
 
-# ================= OB-HAVO EMOJI =================
+# ================= JUMA TABRIKLAR =================
+RAMAZON_START = datetime(2026, 2, 18).date()
+RAMAZON_END = datetime(2026, 3, 19).date()
+
+ramadan_friday_messages = [
+    "🌙 Ramazon muborak!\n\nBugun muborak juma kuni.\nRo'za tutayotgan barcha musulmonlarning\nro'zalarini Alloh qabul qilsin 🤲\n\n✨ Juma muborak!",
+    "🌙 Ramazonning muborak juma kuni!\n\nAlloh tutgan ro'zalaringizni,\nqilgan ibodatlaringizni qabul qilsin.\n\n🤲 Juma muborak!",
+    "🌙 Ramazon oyidagi muborak juma!\n\nDuolaringiz ijobat,\nro'zalaringiz qabul bo'lsin.\n\n✨ Juma muborak!"
+]
+
+normal_friday_messages = [
+    "🌙 Assalomu alaykum\n\nBugun muborak juma kuni.\nAlloh barcha musulmonlarning\nduolarini qabul qilsin.\n\n✨ Juma muborak!",
+    "🤲 Juma ayyomi muborak bo'lsin!\n\nAlloh qilgan ibodatlaringizni\nqabul qilsin.",
+    "🌙 Hayrli jumalar!\n\nBugun qilgan duolaringiz,\nniyatlaringiz ijobat bo'lsin.",
+    "🕌 Juma muborak!\n\nBugun juma namozini o'qishni unutmang.\nAlloh barchangizni qabul qilsin! 🤲",
+]
+
+# ================= OB-HAVO YORDAMCHI =================
 def get_weather_emoji(description):
     desc = description.lower()
     if "clear" in desc:
@@ -90,8 +113,29 @@ def get_wind_direction(deg):
     idx = round(deg / 45) % 8
     return directions[idx]
 
+desc_map = {
+    "clear sky": "Ochiq osmon",
+    "few clouds": "Ozgina bulut",
+    "scattered clouds": "Bulutli",
+    "broken clouds": "Ko'p bulutli",
+    "overcast clouds": "Quyuq bulutli",
+    "light rain": "Yengil yomg'ir",
+    "moderate rain": "O'rtacha yomg'ir",
+    "heavy intensity rain": "Kuchli yomg'ir",
+    "thunderstorm": "Momaqaldiroq",
+    "snow": "Qor",
+    "mist": "Tuman",
+    "fog": "Qalin tuman",
+    "haze": "Tutun",
+}
+
 # ================= OB-HAVO FUNKSIYASI =================
 async def morning_weather():
+    today = datetime.now(UZ_TZ)
+    today_date = today.date()
+    is_friday = today.weekday() == 4
+    wish = random.choice(morning_wishes)
+
     try:
         url = (
             f"https://api.openweathermap.org/data/2.5/weather"
@@ -112,65 +156,39 @@ async def morning_weather():
         description = data["weather"][0]["description"]
         emoji = get_weather_emoji(description)
         wind_dir = get_wind_direction(wind_deg)
-
-        desc_map = {
-            "clear sky": "Ochiq osmon",
-            "few clouds": "Ozgina bulut",
-            "scattered clouds": "Bulutli",
-            "broken clouds": "Ko'p bulutli",
-            "overcast clouds": "Quyuq bulutli",
-            "light rain": "Yengil yomg'ir",
-            "moderate rain": "O'rtacha yomg'ir",
-            "heavy intensity rain": "Kuchli yomg'ir",
-            "thunderstorm": "Momaqaldiroq",
-            "snow": "Qor",
-            "mist": "Tuman",
-            "fog": "Qalin tuman",
-            "haze": "Tutun",
-        }
         desc_uz = desc_map.get(description, description.capitalize())
-        wish = random.choice(morning_wishes)
-        today = datetime.now(UZ_TZ)
-        is_friday = today.weekday() == 4  # 4 = Juma
-
-        # Juma tabrigi
-        if is_friday:
-            today_date = today.date()
-            if RAMAZON_START <= today_date <= RAMAZON_END:
-                friday_text = random.choice(ramadan_friday_messages)
-            else:
-                friday_text = random.choice(normal_friday_messages)
-        else:
-            friday_text = None
 
         text = (
             f"🌅 Xayrli tong, Do'stlarim!\n"
             f"📅 {today.strftime('%d.%m.%Y')} | {today.strftime('%H:%M')}\n\n"
             f"🏙 Namangan ob-havosi:\n"
-            f"{'━'*20}\n"
+            f"{'━' * 20}\n"
             f"{emoji} {desc_uz}\n"
             f"🌡 Harorat: {temp}°C (his: {feels_like}°C)\n"
             f"💧 Namlik: {humidity}%\n"
             f"💨 Shamol: {wind_speed} m/s, {wind_dir}\n"
-            f"{'━'*20}\n\n"
+            f"{'━' * 20}\n\n"
             f"{wish}"
         )
 
-        if friday_text:
-            text += f"\n\n{'━'*20}\n{friday_text}"
-
-        await bot.send_message(chat_id=GROUP_ID, text=text)
-
     except Exception as e:
         print(f"❌ Ob-havo xatolik: {e}")
-        today = datetime.now(UZ_TZ)
-        wish = random.choice(morning_wishes)
         text = (
             f"🌅 Xayrli tong, Do'stlarim!\n"
             f"📅 {today.strftime('%d.%m.%Y')}\n\n"
             f"{wish}"
         )
-        await bot.send_message(chat_id=GROUP_ID, text=text)
+
+    # Juma kunida tabrикни ham qo'shamiz
+    if is_friday:
+        if RAMAZON_START <= today_date <= RAMAZON_END:
+            friday_text = random.choice(ramadan_friday_messages)
+        else:
+            friday_text = random.choice(normal_friday_messages)
+        text += f"\n\n{'━' * 20}\n{friday_text}"
+
+    await bot.send_message(chat_id=GROUP_ID, text=text)
+
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
     waiting_for_name = State()
@@ -383,7 +401,7 @@ async def about(message: Message):
         "🤖 Powered by Aiogram & FastAPI\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 6.2\n"
+        "⚙️ Version: 6.3\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -711,30 +729,6 @@ async def today_reminder():
     )
     await bot.send_message(chat_id=GROUP_ID, text=text)
 
-# ================= JUMA TABRIKLAR =================
-RAMAZON_START = datetime(2026, 2, 18).date()
-RAMAZON_END = datetime(2026, 3, 19).date()
-
-ramadan_friday_messages = [
-    "🌙 Ramazon muborak!\n\nBugun muborak juma kuni.\nRo'za tutayotgan barcha musulmonlarning\nro'zalarini Alloh qabul qilsin 🤲\n\n✨ Juma muborak!",
-    "🌙 Ramazonning muborak juma kuni!\n\nAlloh tutgan ro'zalaringizni,\nqilgan ibodatlaringizni qabul qilsin.\n\n🤲 Juma muborak!",
-    "🌙 Ramazon oyidagi muborak juma!\n\nDuolaringiz ijobat,\nro'zalaringiz qabul bo'lsin.\n\n✨ Juma muborak!"
-]
-
-normal_friday_messages = [
-    "🌙 Assalomu alaykum\n\nBugun muborak juma kuni.\nAlloh barcha musulmonlarning\nduolarini qabul qilsin.\n\n✨ Juma muborak!",
-    "🤲 Juma ayyomi muborak bo'lsin!\n\nAlloh qilgan ibodatlaringizni\nqabul qilsin.",
-    "🌙 Hayrli jumalar!\n\nBugun qilgan duolaringiz,\nniyatlaringiz ijobat bo'lsin."
-]
-
-async def friday_greeting():
-    today = datetime.now(UZ_TZ).date()
-    if RAMAZON_START <= today <= RAMAZON_END:
-        text = random.choice(ramadan_friday_messages)
-    else:
-        text = random.choice(normal_friday_messages)
-    await bot.send_message(chat_id=GROUP_ID, text=text)
-
 # ================= CATCH ALL =================
 @dp.message()
 async def handle_all(message: Message):
@@ -781,10 +775,9 @@ async def startup():
         scheduler.add_job(morning_weather, "cron", hour=6, minute=0)
         scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)
-        #scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 6.2")
+        print("✅ Bot ishga tushdi! Version 6.3")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
