@@ -50,18 +50,18 @@ MONTHS = ["yanvar ","fevral ","mart   ","aprel  ","may    ","iyun   ",
 
 # ================= TILAKLAR =================
 morning_wishes = [
-    "☀️ Bugun ajoyib kun bo'lsin! Har bir daqiqangiz qimmatli — undan to'g'ri foydalaning!",
-    "🌅 Yangi kun — yangi imkoniyat! Bugun kechagidan yaxshiroq bo'ling!",
-    "💪 Bugungi kun sizniki! Maqsadlaringizga qadam tashlang!",
-    "🌸 Ilm izlash — eng sharafli yo'l. Bugun ham ko'p o'rganing!",
-    "✨ Har ertalab yangi hayot boshlanadi. Bugunni qadrlang!",
-    "🎯 Kichik qadamlar katta maqsadlarga olib boradi. Bugun ham harakat qiling!",
-    "🌟 Sabr va mehnat hech narsani yengolmaydi. Bugun ham sabrli bo'ling!",
-    "📚 Bilim — eng katta boylik. Bugun ham biror yangi narsa o'rganing!",
-    "🤲 Alloh barchangizga bugungi kunni muborak qilsin!",
-    "🌈 Optimizm bilan boshlangan kun doim yaxshi tugaydi!",
-    "⭐ Bugun imtihon, vazifa yoki mashg'ulot bo'lsa — qo'lingizdan keladi!",
-    "🏆 G'alaba — harakat qilganlarnikida. Bugun ham harakat qiling!",
+    "🤲 Alloh barchangizga bugungi kunni muborak va barakali qilsin!",
+    "☀️ Bismillah bilan boshlangan kun doim xayrli bo'ladi!",
+    "📿 Har kuni Allohni zikr qiling — qalblar faqat Allohni zikr qilish bilan xotirjam bo'ladi!",
+    "🌿 Bugun ham solih amal qiling — har bir yaxshi ish sadaqadir!",
+    "🤲 Alloh ilmingizni, axloqingizni va imoningizni ziyoda qilsin!",
+    "☀️ Sabahul xayr! Bugungi kunni ibodат va ilm bilan bezang!",
+    "🕌 Namozni o'z vaqtida o'qing — u eng yaxshi amallardan biridir!",
+    "📚 Ilm izlash — har bir musulmonga farzdir. Bugun ham o'rganing!",
+    "🌸 Alloh sizga sabr, shukr va sog'liq bersin!",
+    "⭐ Ota-onangizga mehr ko'rsating — bu eng afzal ibodatlardan biridir!",
+    "🤲 Tong namozini o'qib, kunni xayrli boshlang!",
+    "🌙 Alloh barchangizni dunyо va oxiratda baxtli qilsin!",
 ]
 
 # ================= OB-HAVO EMOJI =================
@@ -113,7 +113,6 @@ async def morning_weather():
         emoji = get_weather_emoji(description)
         wind_dir = get_wind_direction(wind_deg)
 
-        # Ob-havo tavsifi uzbekcha
         desc_map = {
             "clear sky": "Ochiq osmon",
             "few clouds": "Ozgina bulut",
@@ -130,12 +129,22 @@ async def morning_weather():
             "haze": "Tutun",
         }
         desc_uz = desc_map.get(description, description.capitalize())
-
         wish = random.choice(morning_wishes)
         today = datetime.now(UZ_TZ)
+        is_friday = today.weekday() == 4  # 4 = Juma
+
+        # Juma tabrigi
+        if is_friday:
+            today_date = today.date()
+            if RAMAZON_START <= today_date <= RAMAZON_END:
+                friday_text = random.choice(ramadan_friday_messages)
+            else:
+                friday_text = random.choice(normal_friday_messages)
+        else:
+            friday_text = None
 
         text = (
-            f"🌅 Xayrli tong, 9B sinfi!\n"
+            f"🌅 Xayrli tong, Do'stlarim!\n"
             f"📅 {today.strftime('%d.%m.%Y')} | {today.strftime('%H:%M')}\n\n"
             f"🏙 Namangan ob-havosi:\n"
             f"{'━'*20}\n"
@@ -147,20 +156,21 @@ async def morning_weather():
             f"{wish}"
         )
 
+        if friday_text:
+            text += f"\n\n{'━'*20}\n{friday_text}"
+
         await bot.send_message(chat_id=GROUP_ID, text=text)
 
     except Exception as e:
         print(f"❌ Ob-havo xatolik: {e}")
-        # Ob-havo olmasa ham tilak yuboramiz
         today = datetime.now(UZ_TZ)
         wish = random.choice(morning_wishes)
         text = (
-            f"🌅 Xayrli tong, 9B sinfi!\n"
+            f"🌅 Xayrli tong, Do'stlarim!\n"
             f"📅 {today.strftime('%d.%m.%Y')}\n\n"
             f"{wish}"
         )
         await bot.send_message(chat_id=GROUP_ID, text=text)
-
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
     waiting_for_name = State()
@@ -368,7 +378,7 @@ async def about(message: Message):
         "🌤 Har kuni ob-havo ma'lumoti\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 6.0\n"
+        "⚙️ Version: 6.1\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -709,7 +719,7 @@ ramadan_friday_messages = [
 normal_friday_messages = [
     "🌙 Assalomu alaykum\n\nBugun muborak juma kuni.\nAlloh barcha musulmonlarning\nduolarini qabul qilsin.\n\n✨ Juma muborak!",
     "🤲 Juma ayyomi muborak bo'lsin!\n\nAlloh qilgan ibodatlaringizni\nqabul qilsin.",
-    "🌙 Hayrli juma!\n\nBugun qilgan duolaringiz,\nniyatlaringiz ijobat bo'lsin."
+    "🌙 Hayrli jumalar!\n\nBugun qilgan duolaringiz,\nniyatlaringiz ijobat bo'lsin."
 ]
 
 async def friday_greeting():
@@ -769,7 +779,7 @@ async def startup():
         scheduler.add_job(friday_greeting, "cron", day_of_week="fri", hour=9, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 6.0")
+        print("✅ Bot ishga tushdi! Version 6.1")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
