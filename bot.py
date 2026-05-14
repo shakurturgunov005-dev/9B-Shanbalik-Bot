@@ -349,10 +349,10 @@ async def ping(message: Message):
         "━━━━━━━━━━━━━━━━━━\n\n"
         "🤖 Bot: Online\n"
         "📡 Webhook: Active\n"
-        "🗄 Database: Connected"
-        "⏰ Scheduler: Running"
-        "☁️ Server: Render Cloud"
-        "🚀 Uptime: 24/7"
+        "🗄 Database: Connected\n"
+        "⏰ Scheduler: Running\n"
+        "☁️ Server: Render Cloud\n"
+        "🚀 Uptime: 24/7\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
