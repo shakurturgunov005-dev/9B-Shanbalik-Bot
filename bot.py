@@ -107,12 +107,6 @@ def get_weather_emoji(description):
     else:
         return "🌤️"
 
-def get_wind_direction(deg):
-    directions = ["Shimol", "Shimol-Sharq", "Sharq", "Janub-Sharq",
-                  "Janub", "Janub-G'arb", "G'arb", "Shimol-G'arb"]
-    idx = round(deg / 45) % 8
-    return directions[idx]
-
 desc_map = {
     "clear sky": "Ochiq osmon",
     "few clouds": "Ozgina bulut",
@@ -139,7 +133,7 @@ async def morning_weather():
     try:
         url = (
             f"https://api.openweathermap.org/data/2.5/weather"
-            f"?q=Namangan,UZ"
+            f"?q=Kosonsoy,UZ"
             f"&appid={WEATHER_API_KEY}"
             f"&units=metric"
             f"&lang=en"
@@ -149,33 +143,21 @@ async def morning_weather():
                 data = await resp.json()
 
         temp = round(data["main"]["temp"])
-        feels_like = round(data["main"]["feels_like"])
-        humidity = data["main"]["humidity"]
-        wind_speed = round(data["wind"]["speed"])
-        wind_deg = data["wind"].get("deg", 0)
         description = data["weather"][0]["description"]
         emoji = get_weather_emoji(description)
-        wind_dir = get_wind_direction(wind_deg)
         desc_uz = desc_map.get(description, description.capitalize())
 
         text = (
-            f"🌅 Xayrli tong, Do'stlarim!\n"
-            f"📅 {today.strftime('%d.%m.%Y')} | {today.strftime('%H:%M')}\n\n"
-            f"🏙 Namangan ob-havosi:\n"
-            f"{'━' * 20}\n"
-            f"{emoji} {desc_uz}\n"
-            f"🌡 Harorat: {temp}°C (his: {feels_like}°C)\n"
-            f"💧 Namlik: {humidity}%\n"
-            f"💨 Shamol: {wind_speed} m/s, {wind_dir}\n"
-            f"{'━' * 20}\n\n"
+            f"🌅 Xayrli tong, Do'stlarim!\n\n"
+            f"🏙 Kosonsoy, Namangan\n"
+            f"{emoji} {desc_uz} | {temp}°C\n\n"
             f"{wish}"
         )
 
     except Exception as e:
         print(f"❌ Ob-havo xatolik: {e}")
         text = (
-            f"🌅 Xayrli tong, Do'stlarim!\n"
-            f"📅 {today.strftime('%d.%m.%Y')}\n\n"
+            f"🌅 Xayrli tong, Do'stlarim!\n\n"
             f"{wish}"
         )
 
@@ -185,9 +167,27 @@ async def morning_weather():
             friday_text = random.choice(ramadan_friday_messages)
         else:
             friday_text = random.choice(normal_friday_messages)
-        text += f"\n\n{'━' * 20}\n{friday_text}"
+        text += f"\n\n{friday_text}"
 
-    await bot.send_message(chat_id=GROUP_ID, text=text)
+    # Oldingi xabarni o'chirish
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT message_id FROM bot_settings WHERE key = 'last_weather_msg'")
+        if row:
+            try:
+                await bot.delete_message(chat_id=GROUP_ID, message_id=row["message_id"])
+            except:
+                pass
+
+    # Yangi xabar yuborish
+    sent = await bot.send_message(chat_id=GROUP_ID, text=text)
+
+    # Yangi message_id ni saqlash
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO bot_settings (key, message_id)
+            VALUES ('last_weather_msg', $1)
+            ON CONFLICT (key) DO UPDATE SET message_id = $1
+        """, sent.message_id)
 
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
@@ -244,6 +244,12 @@ async def init_db():
             name TEXT NOT NULL,
             shanbalik_date DATE NOT NULL,
             completed_at TIMESTAMP DEFAULT NOW()
+        )
+        """)
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS bot_settings (
+            key TEXT PRIMARY KEY,
+            message_id BIGINT
         )
         """)
 
@@ -401,7 +407,7 @@ async def about(message: Message):
         "🤖 Powered by Aiogram & FastAPI\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 6.3\n"
+        "⚙️ Version: 6.4\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -777,7 +783,7 @@ async def startup():
         scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 6.3")
+        print("✅ Bot ishga tushdi! Version 6.4")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
