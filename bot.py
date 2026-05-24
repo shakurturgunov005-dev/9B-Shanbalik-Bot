@@ -48,6 +48,34 @@ db_pool = None
 MONTHS = ["yanvar ","fevral ","mart   ","aprel  ","may    ","iyun   ",
           "iyul   ","avgust ","sentabr","oktabr ","noyabr ","dekabr "]
 
+# ================= POLL VARIANTLARI =================
+POLL_OPTIONS = ["Osh markaz", "Shashlik", "To'raqo'rg'on", "Kosonsoy", "Namangan"]
+
+WINNER_MESSAGES = {
+    "Osh markaz": (
+        "🍚 Osh bo'lsa Oshda do'stlarim!\n"
+        "Ko'pchilik ovoz berdi — bu safar osh!\n"
+        "Ishtaha osh bo'lsin! 😋"
+    ),
+    "Shashlik": (
+        "🔥 Shashlik bo'ladi do'stlarim!\n"
+        "Ko'pchilik ovoz berdi — bu safar shashlik!\n"
+        "Tayyor bo'linglar! 😄"
+    ),
+    "To'raqo'rg'on": (
+        "🚗 To'raqo'rg'onga yo'l olamiz!\n"
+        "Ko'pchilik shu tomonga ovoz berdi!"
+    ),
+    "Kosonsoy": (
+        "🌿 Kosonsoyga ketamiz do'stlarim!\n"
+        "Tabiat qo'ynida dam olamiz!"
+    ),
+    "Namangan": (
+        "🏙 Namanganga boramiz!\n"
+        "Shahar markazida yig'ilamiz!"
+    ),
+}
+
 # ================= ISLOMIY TILAKLAR =================
 morning_wishes = [
     "🤲 Alloh barchangizga bugungi kunni muborak va barakali qilsin!",
@@ -161,7 +189,6 @@ async def morning_weather():
             f"{wish}"
         )
 
-    # Juma kunida tabrикни ham qo'shamiz
     if is_friday:
         if RAMAZON_START <= today_date <= RAMAZON_END:
             friday_text = random.choice(ramadan_friday_messages)
@@ -178,16 +205,168 @@ async def morning_weather():
             except:
                 pass
 
-    # Yangi xabar yuborish
     sent = await bot.send_message(chat_id=GROUP_ID, text=text)
 
-    # Yangi message_id ni saqlash
     async with db_pool.acquire() as conn:
         await conn.execute("""
             INSERT INTO bot_settings (key, message_id)
             VALUES ('last_weather_msg', $1)
             ON CONFLICT (key) DO UPDATE SET message_id = $1
         """, sent.message_id)
+
+# ================= 3 KUN OLDIN: ESLATMA + POLL =================
+async def three_days_before_reminder():
+    student = await get_current_student()
+    if not student:
+        return
+
+    today = datetime.now(UZ_TZ).date()
+    shanbalik_date = student["shanbalik_date"]
+
+    if (shanbalik_date - today).days != 3:
+        return
+
+    formatted_date = format_date(shanbalik_date)
+
+    # Eslatma xabari
+    text = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"📢 SHANBALIK ESLATMASI\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"⏳ Shanbalikka 3 kun qoldi.\n\n"
+        f"👤 Navbatchi:\n"
+        f"{student['name']}\n\n"
+        f"📅 Sana:\n"
+        f"{formatted_date}\n\n"
+        f"💬 Taklif va rejalarni muhokama qiling:\n"
+        f"📍 Joy\n"
+        f"🍽 Tanovvul\n"
+        f"🕒 Vaqt\n\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=text)
+
+    # Poll yuborish
+    poll_msg = await bot.send_poll(
+        chat_id=GROUP_ID,
+        question="📍 Qayerda qilamiz?",
+        options=POLL_OPTIONS,
+        is_anonymous=False,
+        allows_multiple_answers=False,
+    )
+
+    # Poll message_id ni saqlash
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO bot_settings (key, message_id)
+            VALUES ('last_poll_msg', $1)
+            ON CONFLICT (key) DO UPDATE SET message_id = $1
+        """, poll_msg.message_id)
+        await conn.execute("""
+            INSERT INTO bot_settings (key, message_id)
+            VALUES ('poll_id', $1)
+            ON CONFLICT (key) DO UPDATE SET message_id = $1
+        """, hash(poll_msg.poll.id) % 2147483647)
+
+        # Poll id ni text sifatida saqlash
+        await conn.execute("""
+            INSERT INTO bot_settings (key, text_value)
+            VALUES ('poll_str_id', $1)
+            ON CONFLICT (key) DO UPDATE SET text_value = $1
+        """, poll_msg.poll.id)
+
+# ================= 2 KUN OLDIN: POLL NATIJASI =================
+async def two_days_before_announcement():
+    student = await get_current_student()
+    if not student:
+        return
+
+    today = datetime.now(UZ_TZ).date()
+    shanbalik_date = student["shanbalik_date"]
+
+    if (shanbalik_date - today).days != 2:
+        return
+
+    # Poll ni yopish va natijasini olish
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT message_id FROM bot_settings WHERE key = 'last_poll_msg'")
+        poll_id_row = await conn.fetchrow("SELECT text_value FROM bot_settings WHERE key = 'poll_str_id'")
+
+    if not row or not poll_id_row:
+        return
+
+    try:
+        # Pollni yopish
+        stopped_poll = await bot.stop_poll(
+            chat_id=GROUP_ID,
+            message_id=row["message_id"]
+        )
+
+        # G'olibni aniqlash
+        max_votes = 0
+        winner = None
+        for i, option in enumerate(stopped_poll.options):
+            if option.voter_count > max_votes:
+                max_votes = option.voter_count
+                winner = POLL_OPTIONS[i]
+
+        if winner and max_votes > 0:
+            winner_text = WINNER_MESSAGES.get(winner, f"✅ {winner} tanlandi!")
+            await bot.send_message(chat_id=GROUP_ID, text=winner_text)
+        else:
+            await bot.send_message(
+                chat_id=GROUP_ID,
+                text="🤔 Hech kim ovoz bermadi. Joy hali aniqlanmagan!"
+            )
+
+    except Exception as e:
+        print(f"❌ Poll natijasi xatolik: {e}")
+
+# ================= 1 KUN OLDIN =================
+async def one_day_before_reminder():
+    student = await get_current_student()
+    if not student:
+        return
+
+    today = datetime.now(UZ_TZ).date()
+    shanbalik_date = student["shanbalik_date"]
+
+    if (shanbalik_date - today).days != 1:
+        return
+
+    formatted_date = format_date(shanbalik_date)
+    text = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"📢 ESLATMA\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"⏳ Ertaga shanbalik!\n\n"
+        f"👤 Navbatchi: {student['name']}\n"
+        f"📅 Sana: {formatted_date}\n\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=text)
+
+# ================= SHANBALIK KUNI =================
+async def today_reminder():
+    student = await get_current_student()
+    if not student:
+        return
+
+    today = datetime.now(UZ_TZ).date()
+    if student["shanbalik_date"] != today:
+        return
+
+    formatted_date = format_date(today)
+    text = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"🔔 BUGUN SHANBALIK!\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 Navbatchi: {student['name']}\n"
+        f"📅 Sana: {formatted_date}\n\n"
+        f"Omad! 💪\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=text)
 
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
@@ -249,7 +428,8 @@ async def init_db():
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS bot_settings (
             key TEXT PRIMARY KEY,
-            message_id BIGINT
+            message_id BIGINT,
+            text_value TEXT
         )
         """)
 
@@ -403,11 +583,12 @@ async def about(message: Message):
         "📅 Navbatlarni avtomatik yuritadi\n"
         "⏰ Eslatmalar yuboradi\n"
         "🌤 Har kuni ob-havo ma'lumoti\n"
+        "📊 Shanbalik joyi uchun poll\n"
         "🚀 24/7 Live system\n"
         "🤖 Powered by Aiogram & FastAPI\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 6.4\n"
+        "⚙️ Version: 7.0\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -705,36 +886,6 @@ async def cb_confirm_clear_history(callback: CallbackQuery):
                                      reply_markup=back_button("back_admin"))
     await callback.answer()
 
-# ================= REMINDER FUNCTIONS =================
-async def one_day_before_reminder():
-    student = await get_current_student()
-    if not student:
-        return
-    today = datetime.now(UZ_TZ).date()
-    shanbalik_date = student["shanbalik_date"]
-    if (shanbalik_date - today).days == 1:
-        text = (
-            f"📢 Eslatma! 1 kun qoldi\n"
-            f"Ertaga shanbalik:\n"
-            f"👤 {student['name']}\n"
-            f"📅 {format_date(shanbalik_date)}"
-        )
-        await bot.send_message(chat_id=GROUP_ID, text=text)
-
-async def today_reminder():
-    student = await get_current_student()
-    if not student:
-        return
-    today = datetime.now(UZ_TZ).date()
-    if student["shanbalik_date"] != today:
-        return
-    text = (
-        f"📢 Bugun shanbalik:\n"
-        f"👤 {student['name']}\n"
-        f"📅 {format_date(today)}"
-    )
-    await bot.send_message(chat_id=GROUP_ID, text=text)
-
 # ================= CATCH ALL =================
 @dp.message()
 async def handle_all(message: Message):
@@ -779,11 +930,13 @@ async def startup():
         print(f"✅ Webhook sozlandi: {WEBHOOK_URL}")
 
         scheduler.add_job(morning_weather, "cron", hour=6, minute=0)
-        scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
+        scheduler.add_job(three_days_before_reminder, "cron", hour=10, minute=0)
+        scheduler.add_job(two_days_before_announcement, "cron", hour=10, minute=0)
         scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)
+        scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 6.4")
+        print("✅ Bot ishga tushdi! Version 7.0")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
