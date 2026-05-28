@@ -934,6 +934,10 @@ async def startup():
         import traceback
         traceback.print_exc()
 
+@app.get("/")
+async def health_check():
+    return JSONResponse({"status": "ok", "bot": "running"})
+
 # ================= WEBHOOK =================
 @app.post("/webhook")
 async def webhook(request: Request):
