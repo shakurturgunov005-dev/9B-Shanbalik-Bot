@@ -265,7 +265,7 @@ async def three_days_before_reminder():
             ON CONFLICT (key) DO UPDATE SET text_value = $1
         """, poll_msg.poll.id)
 
-# ================= 2 KUN OLDIN: POLL NATIJASI =================
+# ================= 2 KUN OLDIN SOAT 10:00: POLL NATIJASI =================
 async def two_days_before_announcement():
     student = await get_current_student()
     if not student:
@@ -308,6 +308,27 @@ async def two_days_before_announcement():
 
     except Exception as e:
         print(f"❌ Poll natijasi xatolik: {e}")
+
+# ================= 2 KUN OLDIN SOAT 18:00: POLL ESLATMASI =================
+async def poll_vote_reminder():
+    student = await get_current_student()
+    if not student:
+        return
+
+    today = datetime.now(UZ_TZ).date()
+    shanbalik_date = student["shanbalik_date"]
+
+    if (shanbalik_date - today).days != 2:
+        return
+
+    text = (
+        "⏰ Eslatma!\n\n"
+        "📊 Shanbalik joyi uchun poll\n"
+        "hali ochiq — ovoz berishni\n"
+        "unutmang!\n\n"
+        "👆 Yuqoridagi pollga qarang"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=text)
 
 # ================= 1 KUN OLDIN =================
 async def one_day_before_reminder():
@@ -579,7 +600,7 @@ async def about(message: Message):
         "🤖 Powered by Aiogram & FastAPI\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 7.1\n"
+        "⚙️ Version: 7.2\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -923,17 +944,19 @@ async def startup():
         scheduler.add_job(morning_weather, "cron", hour=6, minute=0)
         scheduler.add_job(three_days_before_reminder, "cron", hour=10, minute=0)
         scheduler.add_job(two_days_before_announcement, "cron", hour=10, minute=0)
+        scheduler.add_job(poll_vote_reminder, "cron", hour=18, minute=0)
         scheduler.add_job(one_day_before_reminder, "cron", hour=7, minute=0)
         scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 7.1")
+        print("✅ Bot ishga tushdi! Version 7.2")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
         import traceback
         traceback.print_exc()
 
+# ================= HEALTH CHECK =================
 @app.api_route("/", methods=["GET", "HEAD"])
 async def health_check():
     return JSONResponse({"status": "ok", "bot": "running"})
