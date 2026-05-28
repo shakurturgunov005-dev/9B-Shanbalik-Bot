@@ -934,7 +934,7 @@ async def startup():
         import traceback
         traceback.print_exc()
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def health_check():
     return JSONResponse({"status": "ok", "bot": "running"})
 
