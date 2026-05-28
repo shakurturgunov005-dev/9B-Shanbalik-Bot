@@ -228,7 +228,6 @@ async def three_days_before_reminder():
 
     formatted_date = format_date(shanbalik_date)
 
-    # Eslatma xabari
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📢 SHANBALIK ESLATMASI\n"
@@ -246,7 +245,6 @@ async def three_days_before_reminder():
     )
     await bot.send_message(chat_id=GROUP_ID, text=text)
 
-    # Poll yuborish
     poll_msg = await bot.send_poll(
         chat_id=GROUP_ID,
         question="📍 Qayerda qilamiz?",
@@ -255,20 +253,12 @@ async def three_days_before_reminder():
         allows_multiple_answers=False,
     )
 
-    # Poll message_id ni saqlash
     async with db_pool.acquire() as conn:
         await conn.execute("""
             INSERT INTO bot_settings (key, message_id)
             VALUES ('last_poll_msg', $1)
             ON CONFLICT (key) DO UPDATE SET message_id = $1
         """, poll_msg.message_id)
-        await conn.execute("""
-            INSERT INTO bot_settings (key, message_id)
-            VALUES ('poll_id', $1)
-            ON CONFLICT (key) DO UPDATE SET message_id = $1
-        """, hash(poll_msg.poll.id) % 2147483647)
-
-        # Poll id ni text sifatida saqlash
         await conn.execute("""
             INSERT INTO bot_settings (key, text_value)
             VALUES ('poll_str_id', $1)
@@ -287,7 +277,6 @@ async def two_days_before_announcement():
     if (shanbalik_date - today).days != 2:
         return
 
-    # Poll ni yopish va natijasini olish
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("SELECT message_id FROM bot_settings WHERE key = 'last_poll_msg'")
         poll_id_row = await conn.fetchrow("SELECT text_value FROM bot_settings WHERE key = 'poll_str_id'")
@@ -296,13 +285,11 @@ async def two_days_before_announcement():
         return
 
     try:
-        # Pollni yopish
         stopped_poll = await bot.stop_poll(
             chat_id=GROUP_ID,
             message_id=row["message_id"]
         )
 
-        # G'olibni aniqlash
         max_votes = 0
         winner = None
         for i, option in enumerate(stopped_poll.options):
@@ -431,6 +418,10 @@ async def init_db():
             message_id BIGINT,
             text_value TEXT
         )
+        """)
+        await conn.execute("""
+            ALTER TABLE bot_settings
+            ADD COLUMN IF NOT EXISTS text_value TEXT
         """)
 
 # ================= UTIL FUNCTIONS =================
@@ -588,7 +579,7 @@ async def about(message: Message):
         "🤖 Powered by Aiogram & FastAPI\n\n"
         "👨‍💻 Developer: Shukurullo\n"
         "📅 2026\n"
-        "⚙️ Version: 7.0\n"
+        "⚙️ Version: 7.1\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -936,7 +927,7 @@ async def startup():
         scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 7.0")
+        print("✅ Bot ishga tushdi! Version 7.1")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
