@@ -118,22 +118,14 @@ normal_friday_messages = [
 # ================= OB-HAVO YORDAMCHI =================
 def get_weather_emoji(description):
     desc = description.lower()
-    if "clear" in desc:
-        return "☀️"
-    elif "cloud" in desc:
-        return "⛅"
-    elif "rain" in desc:
-        return "🌧️"
-    elif "snow" in desc:
-        return "❄️"
-    elif "thunder" in desc:
-        return "⛈️"
-    elif "mist" in desc or "fog" in desc or "haze" in desc:
-        return "🌫️"
-    elif "wind" in desc:
-        return "💨"
-    else:
-        return "🌤️"
+    if "clear" in desc: return "☀️"
+    elif "cloud" in desc: return "⛅"
+    elif "rain" in desc: return "🌧️"
+    elif "snow" in desc: return "❄️"
+    elif "thunder" in desc: return "⛈️"
+    elif "mist" in desc or "fog" in desc or "haze" in desc: return "🌫️"
+    elif "wind" in desc: return "💨"
+    else: return "🌤️"
 
 desc_map = {
     "clear sky": "Ochiq osmon",
@@ -163,8 +155,7 @@ async def morning_weather():
             f"https://api.openweathermap.org/data/2.5/weather"
             f"?q=Kosonsoy,UZ"
             f"&appid={WEATHER_API_KEY}"
-            f"&units=metric"
-            f"&lang=en"
+            f"&units=metric&lang=en"
         )
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as resp:
@@ -174,20 +165,15 @@ async def morning_weather():
         description = data["weather"][0]["description"]
         emoji = get_weather_emoji(description)
         desc_uz = desc_map.get(description, description.capitalize())
-
         text = (
             f"🌅 Xayrli tong, Do'stlarim!\n\n"
             f"🏙 Kosonsoy, Namangan\n"
             f"{emoji} {desc_uz} | {temp}°C\n\n"
             f"{wish}"
         )
-
     except Exception as e:
         print(f"❌ Ob-havo xatolik: {e}")
-        text = (
-            f"🌅 Xayrli tong, Do'stlarim!\n\n"
-            f"{wish}"
-        )
+        text = f"🌅 Xayrli tong, Do'stlarim!\n\n{wish}"
 
     if is_friday:
         if RAMAZON_START <= today_date <= RAMAZON_END:
@@ -196,7 +182,6 @@ async def morning_weather():
             friday_text = random.choice(normal_friday_messages)
         text += f"\n\n{friday_text}"
 
-    # Oldingi xabarni o'chirish
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("SELECT message_id FROM bot_settings WHERE key = 'last_weather_msg'")
         if row:
@@ -214,33 +199,25 @@ async def morning_weather():
             ON CONFLICT (key) DO UPDATE SET message_id = $1
         """, sent.message_id)
 
-# ================= 3 KUN OLDIN: ESLATMA + POLL =================
+# ================= 3 KUN OLDIN =================
 async def three_days_before_reminder():
     student = await get_current_student()
     if not student:
         return
-
     today = datetime.now(UZ_TZ).date()
     shanbalik_date = student["shanbalik_date"]
-
     if (shanbalik_date - today).days != 3:
         return
-
     formatted_date = format_date(shanbalik_date)
-
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📢 SHANBALIK ESLATMASI\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"⏳ Shanbalikka 3 kun qoldi.\n\n"
-        f"👤 Navbatchi:\n"
-        f"{student['name']}\n\n"
-        f"📅 Sana:\n"
-        f"{formatted_date}\n\n"
+        f"👤 Navbatchi:\n{student['name']}\n\n"
+        f"📅 Sana:\n{formatted_date}\n\n"
         f"💬 Taklif va rejalarni muhokama qiling:\n"
-        f"📍 Joy\n"
-        f"🍽 Tanovvul\n"
-        f"🕒 Vaqt\n\n"
+        f"📍 Joy\n🍽 Tanovvul\n🕒 Vaqt\n\n"
         f"━━━━━━━━━━━━━━━━━━"
     )
     await bot.send_message(chat_id=GROUP_ID, text=text)
@@ -252,7 +229,6 @@ async def three_days_before_reminder():
         is_anonymous=False,
         allows_multiple_answers=False,
     )
-
     async with db_pool.acquire() as conn:
         await conn.execute("""
             INSERT INTO bot_settings (key, message_id)
@@ -265,15 +241,13 @@ async def three_days_before_reminder():
             ON CONFLICT (key) DO UPDATE SET text_value = $1
         """, poll_msg.poll.id)
 
-# ================= 2 KUN OLDIN SOAT 10:00: POLL NATIJASI =================
+# ================= 2 KUN OLDIN: POLL NATIJASI =================
 async def two_days_before_announcement():
     student = await get_current_student()
     if not student:
         return
-
     today = datetime.now(UZ_TZ).date()
     shanbalik_date = student["shanbalik_date"]
-
     if (shanbalik_date - today).days != 2:
         return
 
@@ -285,11 +259,7 @@ async def two_days_before_announcement():
         return
 
     try:
-        stopped_poll = await bot.stop_poll(
-            chat_id=GROUP_ID,
-            message_id=row["message_id"]
-        )
-
+        stopped_poll = await bot.stop_poll(chat_id=GROUP_ID, message_id=row["message_id"])
         max_votes = 0
         winner = None
         for i, option in enumerate(stopped_poll.options):
@@ -301,11 +271,7 @@ async def two_days_before_announcement():
             winner_text = WINNER_MESSAGES.get(winner, f"✅ {winner} tanlandi!")
             await bot.send_message(chat_id=GROUP_ID, text=winner_text)
         else:
-            await bot.send_message(
-                chat_id=GROUP_ID,
-                text="🤔 Hech kim ovoz bermadi. Joy hali aniqlanmagan!"
-            )
-
+            await bot.send_message(chat_id=GROUP_ID, text="🤔 Hech kim ovoz bermadi. Joy hali aniqlanmagan!")
     except Exception as e:
         print(f"❌ Poll natijasi xatolik: {e}")
 
@@ -314,13 +280,10 @@ async def poll_vote_reminder():
     student = await get_current_student()
     if not student:
         return
-
     today = datetime.now(UZ_TZ).date()
     shanbalik_date = student["shanbalik_date"]
-
     if (shanbalik_date - today).days != 2:
         return
-
     text = (
         "⏰ Eslatma!\n\n"
         "📊 Shanbalik joyi uchun poll\n"
@@ -335,13 +298,10 @@ async def one_day_before_reminder():
     student = await get_current_student()
     if not student:
         return
-
     today = datetime.now(UZ_TZ).date()
     shanbalik_date = student["shanbalik_date"]
-
     if (shanbalik_date - today).days != 1:
         return
-
     formatted_date = format_date(shanbalik_date)
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
@@ -359,11 +319,9 @@ async def today_reminder():
     student = await get_current_student()
     if not student:
         return
-
     today = datetime.now(UZ_TZ).date()
     if student["shanbalik_date"] != today:
         return
-
     formatted_date = format_date(today)
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
@@ -375,6 +333,57 @@ async def today_reminder():
         f"━━━━━━━━━━━━━━━━━━"
     )
     await bot.send_message(chat_id=GROUP_ID, text=text)
+
+# ================= SHANBALIK BO'LDI =================
+async def shanbalik_boldi():
+    """Shanbalik bo'ldi — navbatchi tarixga, keyingi e'lon qilinadi"""
+    student = await get_current_student()
+    if not student:
+        return False
+
+    today = datetime.now(UZ_TZ).date()
+    shanbalik_date = student["shanbalik_date"]
+    formatted_date = format_date(shanbalik_date)
+
+    # Guruhga xabar
+    text = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"✅ SHANBALIK BO'LDI!\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"🎉 Shanbalik muvaffaqiyatli o'tdi!\n\n"
+        f"👤 Navbatchi: {student['name']}\n"
+        f"📅 Sana: {formatted_date}\n\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=text)
+
+    # Tarixga o'tkazish
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO history (name, shanbalik_date)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+        """, student["name"], shanbalik_date)
+        await conn.execute("DELETE FROM students WHERE id = $1", student["id"])
+
+    # Keyingi navbatchi
+    await asyncio.sleep(1)
+    next_student = await get_current_student()
+    if next_student:
+        next_date = next_student["shanbalik_date"]
+        days_left = (next_date - today).days
+        next_text = (
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📢 KEYINGI NAVBATCHI\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"👤 {next_student['name']}\n"
+            f"📅 {format_date(next_date)}\n"
+            f"⏳ {days_left} kun qoldi\n\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+        await bot.send_message(chat_id=GROUP_ID, text=next_text)
+
+    return True
 
 # ================= FSM STATES =================
 class AddStudent(StatesGroup):
@@ -398,6 +407,10 @@ def admin_panel_keyboard():
         [InlineKeyboardButton(text="➖ O'quvchi o'chirish", callback_data="remove_student")],
         [InlineKeyboardButton(text="📊 O'quvchilar soni", callback_data="student_count")],
         [InlineKeyboardButton(text="🗑 Tarixni tozalash", callback_data="clear_history")],
+        [
+            InlineKeyboardButton(text="✅ Shanbalik bo'ldi", callback_data="shanbalik_boldi"),
+            InlineKeyboardButton(text="⏳ Kutilmoqda", callback_data="shanbalik_kutilmoqda"),
+        ],
         [InlineKeyboardButton(text="◀️ Orqaga", callback_data="back_main")],
     ])
 
@@ -423,23 +436,20 @@ async def init_db():
             name TEXT UNIQUE,
             position INTEGER,
             shanbalik_date DATE
-        )
-        """)
+        )""")
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             shanbalik_date DATE NOT NULL,
             completed_at TIMESTAMP DEFAULT NOW()
-        )
-        """)
+        )""")
         await conn.execute("""
         CREATE TABLE IF NOT EXISTS bot_settings (
             key TEXT PRIMARY KEY,
             message_id BIGINT,
             text_value TEXT
-        )
-        """)
+        )""")
         await conn.execute("""
             ALTER TABLE bot_settings
             ADD COLUMN IF NOT EXISTS text_value TEXT
@@ -468,9 +478,7 @@ async def get_current_student():
             ORDER BY shanbalik_date ASC LIMIT 1
         """)
         if not student:
-            student = await conn.fetchrow("""
-                SELECT * FROM students ORDER BY shanbalik_date ASC LIMIT 1
-            """)
+            student = await conn.fetchrow("SELECT * FROM students ORDER BY shanbalik_date ASC LIMIT 1")
         return student
 
 async def reset_rotation_if_empty():
@@ -615,22 +623,19 @@ async def clear_keyboard(message: Message):
 @dp.callback_query(F.data == "navbat")
 async def cb_navbat(callback: CallbackQuery):
     text = await get_navbat_text()
-    await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
-                                     reply_markup=back_button())
+    await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML", reply_markup=back_button())
     await callback.answer()
 
 @dp.callback_query(F.data == "royxat")
 async def cb_royxat(callback: CallbackQuery):
     text = await get_royxat_text()
-    await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
-                                     reply_markup=back_button())
+    await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML", reply_markup=back_button())
     await callback.answer()
 
 @dp.callback_query(F.data == "tarix")
 async def cb_tarix(callback: CallbackQuery):
     text = await get_tarix_text()
-    await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
-                                     reply_markup=back_button())
+    await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML", reply_markup=back_button())
     await callback.answer()
 
 @dp.callback_query(F.data == "back_main")
@@ -674,6 +679,88 @@ async def cb_back_admin(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=admin_panel_keyboard())
     await callback.answer()
 
+# ================= SHANBALIK BO'LDI CALLBACK =================
+@dp.callback_query(F.data == "shanbalik_boldi")
+async def cb_shanbalik_boldi(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    student = await get_current_student()
+    if not student:
+        await callback.answer("❌ Ro'yxat bo'sh!", show_alert=True)
+        return
+
+    text = (
+        "━━━━━━━━━━━━━━━━━━\n"
+        "✅ SHANBALIK BO'LDI\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 {student['name']}\n"
+        f"📅 {format_date(student['shanbalik_date'])}\n\n"
+        "⚠️ Tasdiqlaysizmi?\n"
+        "Navbatchi tarixga o'tkaziladi."
+    )
+    await callback.message.edit_text(
+        f"<pre>{text}</pre>", parse_mode="HTML",
+        reply_markup=confirm_keyboard("shanbalik_boldi")
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "confirm_shanbalik_boldi")
+async def cb_confirm_shanbalik_boldi(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    success = await shanbalik_boldi()
+
+    if success:
+        text = (
+            "━━━━━━━━━━━━━━━━━━\n"
+            "✅ AMALGA OSHIRILDI\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "Shanbalik tarixga qo'shildi!\n"
+            "Guruhga xabar yuborildi."
+        )
+    else:
+        text = "❌ Xatolik yuz berdi."
+
+    await callback.message.edit_text(
+        f"<pre>{text}</pre>", parse_mode="HTML",
+        reply_markup=back_button("back_admin")
+    )
+    await callback.answer()
+
+# ================= SHANBALIK KUTILMOQDA CALLBACK =================
+@dp.callback_query(F.data == "shanbalik_kutilmoqda")
+async def cb_shanbalik_kutilmoqda(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
+        return
+
+    student = await get_current_student()
+    if not student:
+        await callback.answer("❌ Ro'yxat bo'sh!", show_alert=True)
+        return
+
+    text = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"⏳ SHANBALIK KUTILMOQDA\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 Navbatchi: {student['name']}\n"
+        f"📅 Sana: {format_date(student['shanbalik_date'])}\n\n"
+        f"Shanbalik hali bo'lmadi.\n"
+        f"Tez orada bo'ladi! 🕐"
+    )
+    await bot.send_message(chat_id=GROUP_ID, text=text)
+
+    await callback.message.edit_text(
+        "<pre>✅ Guruhga xabar yuborildi!</pre>",
+        parse_mode="HTML",
+        reply_markup=back_button("back_admin")
+    )
+    await callback.answer()
+
 # ================= ADD STUDENT =================
 @dp.callback_query(F.data == "add_student")
 async def cb_add_student(callback: CallbackQuery, state: FSMContext):
@@ -681,14 +768,12 @@ async def cb_add_student(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
     await state.set_state(AddStudent.waiting_for_name)
-    await state.update_data(message_id=callback.message.message_id,
-                             chat_id=callback.message.chat.id)
+    await state.update_data(message_id=callback.message.message_id, chat_id=callback.message.chat.id)
     text = (
         "━━━━━━━━━━━━━━━━━━\n"
         "➕ O'QUVCHI QO'SHISH\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
-        "👤 Ism familyani yozing:\n"
-        "(Masalan: Aliyev Ali)"
+        "👤 Ism familyani yozing:\n(Masalan: Aliyev Ali)"
     )
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=back_button("back_admin"))
@@ -710,15 +795,12 @@ async def process_name(message: Message, state: FSMContext):
         "➕ O'QUVCHI QO'SHISH\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 Ism: {message.text}\n\n"
-        "📅 Shanbalik sanasini yozing:\n"
-        "(Masalan: 15.06.2026)"
+        "📅 Shanbalik sanasini yozing:\n(Masalan: 15.06.2026)"
     )
     try:
         await bot.edit_message_text(
-            f"<pre>{text}</pre>",
-            chat_id=data["chat_id"],
-            message_id=data["message_id"],
-            parse_mode="HTML",
+            f"<pre>{text}</pre>", chat_id=data["chat_id"],
+            message_id=data["message_id"], parse_mode="HTML",
             reply_markup=back_button("back_admin")
         )
     except:
@@ -743,15 +825,12 @@ async def process_date(message: Message, state: FSMContext):
             "⚠️ XATO FORMAT\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
             "Sana to'g'ri formatda emas!\n"
-            "📅 To'g'ri format: 15.06.2026\n\n"
-            "Qaytadan yozing:"
+            "📅 To'g'ri format: 15.06.2026\n\nQaytadan yozing:"
         )
         try:
             await bot.edit_message_text(
-                f"<pre>{text}</pre>",
-                chat_id=data["chat_id"],
-                message_id=data["message_id"],
-                parse_mode="HTML",
+                f"<pre>{text}</pre>", chat_id=data["chat_id"],
+                message_id=data["message_id"], parse_mode="HTML",
                 reply_markup=back_button("back_admin")
             )
         except:
@@ -776,10 +855,8 @@ async def process_date(message: Message, state: FSMContext):
     )
     try:
         await bot.edit_message_text(
-            f"<pre>{text}</pre>",
-            chat_id=data["chat_id"],
-            message_id=data["message_id"],
-            parse_mode="HTML",
+            f"<pre>{text}</pre>", chat_id=data["chat_id"],
+            message_id=data["message_id"], parse_mode="HTML",
             reply_markup=back_button("back_admin")
         )
     except:
@@ -907,6 +984,11 @@ async def handle_all(message: Message):
         except:
             pass
 
+# ================= HEALTH CHECK =================
+@app.api_route("/", methods=["GET", "HEAD"])
+async def health_check():
+    return JSONResponse({"status": "ok", "bot": "Shanbalik Bot v7.2"})
+
 # ================= STARTUP =================
 @app.on_event("startup")
 async def startup():
@@ -923,11 +1005,8 @@ async def startup():
 
         print(f"🔄 Database ga ulanish: {DATABASE_URL[:50]}...")
         db_pool = await asyncpg.create_pool(
-            DATABASE_URL,
-            min_size=1,
-            max_size=10,
-            command_timeout=60,
-            max_queries=50000,
+            DATABASE_URL, min_size=1, max_size=10,
+            command_timeout=60, max_queries=50000,
             max_inactive_connection_lifetime=300
         )
         async with db_pool.acquire() as conn:
@@ -955,11 +1034,6 @@ async def startup():
         print(f"❌ XATOLIK: {e}")
         import traceback
         traceback.print_exc()
-
-# ================= HEALTH CHECK =================
-@app.api_route("/", methods=["GET", "HEAD"])
-async def health_check():
-    return JSONResponse({"status": "ok", "bot": "running"})
 
 # ================= WEBHOOK =================
 @app.post("/webhook")
