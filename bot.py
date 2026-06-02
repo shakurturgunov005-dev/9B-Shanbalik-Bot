@@ -153,9 +153,7 @@ async def morning_weather():
     try:
         url = (
             f"https://api.openweathermap.org/data/2.5/weather"
-            f"?q=Kosonsoy,UZ"
-            f"&appid={WEATHER_API_KEY}"
-            f"&units=metric&lang=en"
+            f"?q=Kosonsoy,UZ&appid={WEATHER_API_KEY}&units=metric&lang=en"
         )
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as resp:
@@ -176,10 +174,10 @@ async def morning_weather():
         text = f"🌅 Xayrli tong, Do'stlarim!\n\n{wish}"
 
     if is_friday:
-        if RAMAZON_START <= today_date <= RAMAZON_END:
-            friday_text = random.choice(ramadan_friday_messages)
-        else:
-            friday_text = random.choice(normal_friday_messages)
+        friday_text = random.choice(
+            ramadan_friday_messages if RAMAZON_START <= today_date <= RAMAZON_END
+            else normal_friday_messages
+        )
         text += f"\n\n{friday_text}"
 
     async with db_pool.acquire() as conn:
@@ -199,16 +197,69 @@ async def morning_weather():
             ON CONFLICT (key) DO UPDATE SET message_id = $1
         """, sent.message_id)
 
+# ================= TASDIQLANMAGAN SHANBALIK TEKSHIRISH =================
+async def check_unconfirmed_shanbalik():
+    """Har kuni 09:00 da — o'tib ketgan, tasdiqlanmagan shanbalikni tekshiradi"""
+    today = datetime.now(UZ_TZ).date()
+
+    async with db_pool.acquire() as conn:
+        # O'tib ketgan sana bor, lekin hali ro'yxatda turibdi
+        rows = await conn.fetch("""
+            SELECT * FROM students
+            WHERE shanbalik_date < CURRENT_DATE
+            ORDER BY shanbalik_date ASC
+        """)
+
+    if not rows:
+        return
+
+    for student in rows:
+        shanbalik_date = student["shanbalik_date"]
+        days_passed = (today - shanbalik_date).days
+        formatted_date = format_date(shanbalik_date)
+
+        text = (
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ TASDIQLANMAGAN SHANBALIK\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📅 Sana: {formatted_date}\n"
+            f"👤 Navbatchi: {student['name']}\n"
+            f"⏰ {days_passed} kun o'tdi\n\n"
+            f"Admin tasdiqlashi kerak!\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+
+        # Guruhga xabar
+        await bot.send_message(chat_id=GROUP_ID, text=text)
+
+        # Adminga alohida xabar — tugmalar bilan
+        admin_text = (
+            f"⚠️ {formatted_date} shanbaligi tasdiqlanmagan!\n\n"
+            f"👤 {student['name']}\n\n"
+            f"Nima qilasiz?"
+        )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Shanbalik bo'ldi", callback_data="shanbalik_boldi"),
+                InlineKeyboardButton(text="⏳ Kutilmoqda", callback_data="shanbalik_kutilmoqda"),
+            ]
+        ])
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(chat_id=admin_id, text=admin_text, reply_markup=keyboard)
+            except:
+                pass
+
 # ================= 3 KUN OLDIN =================
 async def three_days_before_reminder():
     student = await get_current_student()
     if not student:
         return
     today = datetime.now(UZ_TZ).date()
-    shanbalik_date = student["shanbalik_date"]
-    if (shanbalik_date - today).days != 3:
+    if (student["shanbalik_date"] - today).days != 3:
         return
-    formatted_date = format_date(shanbalik_date)
+
+    formatted_date = format_date(student["shanbalik_date"])
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📢 SHANBALIK ESLATMASI\n"
@@ -247,8 +298,7 @@ async def two_days_before_announcement():
     if not student:
         return
     today = datetime.now(UZ_TZ).date()
-    shanbalik_date = student["shanbalik_date"]
-    if (shanbalik_date - today).days != 2:
+    if (student["shanbalik_date"] - today).days != 2:
         return
 
     async with db_pool.acquire() as conn:
@@ -281,17 +331,12 @@ async def poll_vote_reminder():
     if not student:
         return
     today = datetime.now(UZ_TZ).date()
-    shanbalik_date = student["shanbalik_date"]
-    if (shanbalik_date - today).days != 2:
+    if (student["shanbalik_date"] - today).days != 2:
         return
-    text = (
-        "⏰ Eslatma!\n\n"
-        "📊 Shanbalik joyi uchun poll\n"
-        "hali ochiq — ovoz berishni\n"
-        "unutmang!\n\n"
-        "👆 Yuqoridagi pollga qarang"
+    await bot.send_message(
+        chat_id=GROUP_ID,
+        text="⏰ Eslatma!\n\n📊 Shanbalik joyi uchun poll\nhali ochiq — ovoz berishni\nUnutmang!\n\n👆 Yuqoridagi pollga qarang"
     )
-    await bot.send_message(chat_id=GROUP_ID, text=text)
 
 # ================= 1 KUN OLDIN =================
 async def one_day_before_reminder():
@@ -299,17 +344,15 @@ async def one_day_before_reminder():
     if not student:
         return
     today = datetime.now(UZ_TZ).date()
-    shanbalik_date = student["shanbalik_date"]
-    if (shanbalik_date - today).days != 1:
+    if (student["shanbalik_date"] - today).days != 1:
         return
-    formatted_date = format_date(shanbalik_date)
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📢 ESLATMA\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"⏳ Ertaga shanbalik!\n\n"
         f"👤 Navbatchi: {student['name']}\n"
-        f"📅 Sana: {formatted_date}\n\n"
+        f"📅 Sana: {format_date(student['shanbalik_date'])}\n\n"
         f"━━━━━━━━━━━━━━━━━━"
     )
     await bot.send_message(chat_id=GROUP_ID, text=text)
@@ -322,13 +365,12 @@ async def today_reminder():
     today = datetime.now(UZ_TZ).date()
     if student["shanbalik_date"] != today:
         return
-    formatted_date = format_date(today)
     text = (
         f"━━━━━━━━━━━━━━━━━━\n"
         f"🔔 BUGUN SHANBALIK!\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 Navbatchi: {student['name']}\n"
-        f"📅 Sana: {formatted_date}\n\n"
+        f"📅 Sana: {format_date(today)}\n\n"
         f"Omad! 💪\n"
         f"━━━━━━━━━━━━━━━━━━"
     )
@@ -336,8 +378,13 @@ async def today_reminder():
 
 # ================= SHANBALIK BO'LDI =================
 async def shanbalik_boldi():
-    """Shanbalik bo'ldi — navbatchi tarixga, keyingi e'lon qilinadi"""
-    student = await get_current_student()
+    async with db_pool.acquire() as conn:
+        # O'tib ketgan yoki bugungi navbatchi
+        student = await conn.fetchrow("""
+            SELECT * FROM students
+            ORDER BY shanbalik_date ASC LIMIT 1
+        """)
+
     if not student:
         return False
 
@@ -362,7 +409,6 @@ async def shanbalik_boldi():
         await conn.execute("""
             INSERT INTO history (name, shanbalik_date)
             VALUES ($1, $2)
-            ON CONFLICT DO NOTHING
         """, student["name"], shanbalik_date)
         await conn.execute("DELETE FROM students WHERE id = $1", student["id"])
 
@@ -461,15 +507,6 @@ def format_date(date):
     month = MONTHS[date.month - 1]
     return f"{day}-{month} {date.year}"
 
-async def move_past_students_to_history():
-    async with db_pool.acquire() as conn:
-        await conn.execute("""
-            INSERT INTO history (name, shanbalik_date)
-            SELECT name, shanbalik_date FROM students
-            WHERE shanbalik_date < CURRENT_DATE
-        """)
-        await conn.execute("DELETE FROM students WHERE shanbalik_date < CURRENT_DATE")
-
 async def get_current_student():
     async with db_pool.acquire() as conn:
         student = await conn.fetchrow("""
@@ -511,7 +548,6 @@ def get_main_text(name, is_admin):
     )
 
 async def get_navbat_text():
-    await move_past_students_to_history()
     await reset_rotation_if_empty()
     student = await get_current_student()
     if not student:
@@ -519,13 +555,14 @@ async def get_navbat_text():
     today = datetime.now(UZ_TZ).date()
     next_date = student["shanbalik_date"]
     days_left = (next_date - today).days
+    status = "⏳ Kutilmoqda" if days_left < 0 else f"⏳ {days_left} kun qoldi"
     return (
         "━━━━━━━━━━━━━━━━━━\n"
         "📊 NAVBAT\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 {student['name']}\n"
         f"📅 {format_date(next_date)}\n"
-        f"⏳ {days_left} kun qoldi\n"
+        f"{status}\n"
         "\n━━━━━━━━━━━━━━━━━━"
     )
 
@@ -568,15 +605,9 @@ async def start_handler(message: Message, state: FSMContext):
 @dp.message(Command("ping"))
 async def ping(message: Message):
     text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "🟢 SYSTEM STATUS\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "🤖 Bot: Online\n"
-        "📡 Webhook: Active\n"
-        "🗄 Database: Connected\n"
-        "⏰ Scheduler: Running\n"
-        "☁️ Server: Render Cloud\n"
-        "🚀 Uptime: 24/7\n"
+        "━━━━━━━━━━━━━━━━━━\n🟢 SYSTEM STATUS\n━━━━━━━━━━━━━━━━━━\n\n"
+        "🤖 Bot: Online\n📡 Webhook: Active\n🗄 Database: Connected\n"
+        "⏰ Scheduler: Running\n☁️ Server: Render Cloud\n🚀 Uptime: 24/7\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -584,31 +615,24 @@ async def ping(message: Message):
 @dp.message(Command("id"))
 async def get_id(message: Message):
     text = (
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🆔 ID MA'LUMOTLARI\n"
-        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n🆔 ID MA'LUMOTLARI\n━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 Sizning ID: {message.from_user.id}\n"
-        f"💬 Chat ID: {message.chat.id}\n"
-        f"━━━━━━━━━━━━━━━━━━"
+        f"💬 Chat ID: {message.chat.id}\n━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
 
 @dp.message(Command("about"))
 async def about(message: Message):
     text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "🤖 BOT HAQIDA\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
+        "━━━━━━━━━━━━━━━━━━\n🤖 BOT HAQIDA\n━━━━━━━━━━━━━━━━━━\n\n"
         "⚡ SHANBALIK MANAGEMENT BOT\n"
         "📅 Navbatlarni avtomatik yuritadi\n"
         "⏰ Eslatmalar yuboradi\n"
         "🌤 Har kuni ob-havo ma'lumoti\n"
         "📊 Shanbalik joyi uchun poll\n"
-        "🚀 24/7 Live system\n"
-        "🤖 Powered by Aiogram & FastAPI\n\n"
-        "👨‍💻 Developer: Shukurullo\n"
-        "📅 2026\n"
-        "⚙️ Version: 7.2\n"
+        "✅ Shanbalik tasdiqlash tizimi\n"
+        "🚀 24/7 Live system\n\n"
+        "👨‍💻 Developer: Shukurullo\n📅 2026\n⚙️ Version: 7.3\n"
         "━━━━━━━━━━━━━━━━━━"
     )
     await message.answer(f"<pre>{text}</pre>", parse_mode="HTML")
@@ -653,12 +677,7 @@ async def cb_admin_panel(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "⚙️ ADMIN PANEL\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "Quyidagi amallardan birini tanlang:"
-    )
+    text = "━━━━━━━━━━━━━━━━━━\n⚙️ ADMIN PANEL\n━━━━━━━━━━━━━━━━━━\n\nQuyidagi amallardan birini tanlang:"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=admin_panel_keyboard())
     await callback.answer()
@@ -669,36 +688,30 @@ async def cb_back_admin(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "⚙️ ADMIN PANEL\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "Quyidagi amallardan birini tanlang:"
-    )
+    text = "━━━━━━━━━━━━━━━━━━\n⚙️ ADMIN PANEL\n━━━━━━━━━━━━━━━━━━\n\nQuyidagi amallardan birini tanlang:"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=admin_panel_keyboard())
     await callback.answer()
 
-# ================= SHANBALIK BO'LDI CALLBACK =================
+# ================= SHANBALIK BO'LDI =================
 @dp.callback_query(F.data == "shanbalik_boldi")
 async def cb_shanbalik_boldi(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
 
-    student = await get_current_student()
+    async with db_pool.acquire() as conn:
+        student = await conn.fetchrow("SELECT * FROM students ORDER BY shanbalik_date ASC LIMIT 1")
+
     if not student:
         await callback.answer("❌ Ro'yxat bo'sh!", show_alert=True)
         return
 
     text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "✅ SHANBALIK BO'LDI\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n✅ SHANBALIK BO'LDI\n━━━━━━━━━━━━━━━━━━\n\n"
         f"👤 {student['name']}\n"
         f"📅 {format_date(student['shanbalik_date'])}\n\n"
-        "⚠️ Tasdiqlaysizmi?\n"
-        "Navbatchi tarixga o'tkaziladi."
+        f"⚠️ Tasdiqlaysizmi?\nNavbatchi tarixga o'tkaziladi."
     )
     await callback.message.edit_text(
         f"<pre>{text}</pre>", parse_mode="HTML",
@@ -713,15 +726,8 @@ async def cb_confirm_shanbalik_boldi(callback: CallbackQuery):
         return
 
     success = await shanbalik_boldi()
-
     if success:
-        text = (
-            "━━━━━━━━━━━━━━━━━━\n"
-            "✅ AMALGA OSHIRILDI\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "Shanbalik tarixga qo'shildi!\n"
-            "Guruhga xabar yuborildi."
-        )
+        text = "━━━━━━━━━━━━━━━━━━\n✅ AMALGA OSHIRILDI\n━━━━━━━━━━━━━━━━━━\n\nShanbalik tarixga qo'shildi!\nGuruhga xabar yuborildi."
     else:
         text = "❌ Xatolik yuz berdi."
 
@@ -731,14 +737,16 @@ async def cb_confirm_shanbalik_boldi(callback: CallbackQuery):
     )
     await callback.answer()
 
-# ================= SHANBALIK KUTILMOQDA CALLBACK =================
+# ================= SHANBALIK KUTILMOQDA =================
 @dp.callback_query(F.data == "shanbalik_kutilmoqda")
 async def cb_shanbalik_kutilmoqda(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
 
-    student = await get_current_student()
+    async with db_pool.acquire() as conn:
+        student = await conn.fetchrow("SELECT * FROM students ORDER BY shanbalik_date ASC LIMIT 1")
+
     if not student:
         await callback.answer("❌ Ro'yxat bo'sh!", show_alert=True)
         return
@@ -753,10 +761,8 @@ async def cb_shanbalik_kutilmoqda(callback: CallbackQuery):
         f"Tez orada bo'ladi! 🕐"
     )
     await bot.send_message(chat_id=GROUP_ID, text=text)
-
     await callback.message.edit_text(
-        "<pre>✅ Guruhga xabar yuborildi!</pre>",
-        parse_mode="HTML",
+        "<pre>✅ Guruhga xabar yuborildi!</pre>", parse_mode="HTML",
         reply_markup=back_button("back_admin")
     )
     await callback.answer()
@@ -769,12 +775,7 @@ async def cb_add_student(callback: CallbackQuery, state: FSMContext):
         return
     await state.set_state(AddStudent.waiting_for_name)
     await state.update_data(message_id=callback.message.message_id, chat_id=callback.message.chat.id)
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "➕ O'QUVCHI QO'SHISH\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "👤 Ism familyani yozing:\n(Masalan: Aliyev Ali)"
-    )
+    text = "━━━━━━━━━━━━━━━━━━\n➕ O'QUVCHI QO'SHISH\n━━━━━━━━━━━━━━━━━━\n\n👤 Ism familyani yozing:\n(Masalan: Aliyev Ali)"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=back_button("back_admin"))
     await callback.answer()
@@ -791,11 +792,8 @@ async def process_name(message: Message, state: FSMContext):
     except:
         pass
     text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "➕ O'QUVCHI QO'SHISH\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        f"👤 Ism: {message.text}\n\n"
-        "📅 Shanbalik sanasini yozing:\n(Masalan: 15.06.2026)"
+        f"━━━━━━━━━━━━━━━━━━\n➕ O'QUVCHI QO'SHISH\n━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 Ism: {message.text}\n\n📅 Shanbalik sanasini yozing:\n(Masalan: 15.06.2026)"
     )
     try:
         await bot.edit_message_text(
@@ -820,13 +818,7 @@ async def process_date(message: Message, state: FSMContext):
     try:
         date = datetime.strptime(message.text.strip(), "%d.%m.%Y").date()
     except ValueError:
-        text = (
-            "━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ XATO FORMAT\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "Sana to'g'ri formatda emas!\n"
-            "📅 To'g'ri format: 15.06.2026\n\nQaytadan yozing:"
-        )
+        text = "━━━━━━━━━━━━━━━━━━\n⚠️ XATO FORMAT\n━━━━━━━━━━━━━━━━━━\n\nSana to'g'ri formatda emas!\n📅 To'g'ri format: 15.06.2026\n\nQaytadan yozing:"
         try:
             await bot.edit_message_text(
                 f"<pre>{text}</pre>", chat_id=data["chat_id"],
@@ -845,14 +837,7 @@ async def process_date(message: Message, state: FSMContext):
             name, count + 1, date
         )
     await state.clear()
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "✅ QO'SHILDI\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        f"👤 {name}\n"
-        f"📅 {format_date(date)}\n"
-        "━━━━━━━━━━━━━━━━━━"
-    )
+    text = f"━━━━━━━━━━━━━━━━━━\n✅ QO'SHILDI\n━━━━━━━━━━━━━━━━━━\n\n👤 {name}\n📅 {format_date(date)}\n━━━━━━━━━━━━━━━━━━"
     try:
         await bot.edit_message_text(
             f"<pre>{text}</pre>", chat_id=data["chat_id"],
@@ -860,8 +845,7 @@ async def process_date(message: Message, state: FSMContext):
             reply_markup=back_button("back_admin")
         )
     except:
-        await message.answer(f"<pre>{text}</pre>", parse_mode="HTML",
-                             reply_markup=back_button("back_admin"))
+        await message.answer(f"<pre>{text}</pre>", parse_mode="HTML", reply_markup=back_button("back_admin"))
 
 # ================= REMOVE STUDENT =================
 @dp.callback_query(F.data == "remove_student")
@@ -881,12 +865,7 @@ async def cb_remove_student(callback: CallbackQuery):
             callback_data=f"del_{row['id']}"
         )])
     buttons.append([InlineKeyboardButton(text="◀️ Orqaga", callback_data="back_admin")])
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "➖ O'QUVCHI O'CHIRISH\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "O'chirmoqchi bo'lgan o'quvchini tanlang:"
-    )
+    text = "━━━━━━━━━━━━━━━━━━\n➖ O'QUVCHI O'CHIRISH\n━━━━━━━━━━━━━━━━━━\n\nO'chirmoqchi bo'lgan o'quvchini tanlang:"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
     await callback.answer()
@@ -901,20 +880,11 @@ async def cb_delete_student(callback: CallbackQuery):
         student = await conn.fetchrow("SELECT name FROM students WHERE id = $1", student_id)
         await conn.execute("DELETE FROM students WHERE id = $1", student_id)
         await conn.execute("""
-            WITH numbered AS (
-                SELECT id, ROW_NUMBER() OVER (ORDER BY position) as new_pos FROM students
-            )
-            UPDATE students SET position = numbered.new_pos
-            FROM numbered WHERE students.id = numbered.id
+            WITH numbered AS (SELECT id, ROW_NUMBER() OVER (ORDER BY position) as new_pos FROM students)
+            UPDATE students SET position = numbered.new_pos FROM numbered WHERE students.id = numbered.id
         """)
     name = student["name"] if student else "O'quvchi"
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "✅ O'CHIRILDI\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        f"👤 {name} ro'yxatdan o'chirildi.\n"
-        "━━━━━━━━━━━━━━━━━━"
-    )
+    text = f"━━━━━━━━━━━━━━━━━━\n✅ O'CHIRILDI\n━━━━━━━━━━━━━━━━━━\n\n👤 {name} ro'yxatdan o'chirildi.\n━━━━━━━━━━━━━━━━━━"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=back_button("back_admin"))
     await callback.answer()
@@ -931,13 +901,11 @@ async def cb_student_count(callback: CallbackQuery):
         next_student = await get_current_student()
     next_name = next_student['name'] if next_student else "Yo'q"
     text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "📊 STATISTIKA\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n📊 STATISTIKA\n━━━━━━━━━━━━━━━━━━\n\n"
         f"👥 Jami o'quvchilar: {students}\n"
         f"📜 Tarixda: {history}\n"
         f"👤 Keyingi navbatchi: {next_name}\n"
-        "━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━━━━━━━━"
     )
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=back_button("back_admin"))
@@ -949,12 +917,7 @@ async def cb_clear_history(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Ruxsat yo'q!", show_alert=True)
         return
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "🗑 TARIXNI TOZALASH\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "⚠️ Haqiqatan tarixni tozalamoqchimisiz?"
-    )
+    text = "━━━━━━━━━━━━━━━━━━\n🗑 TARIXNI TOZALASH\n━━━━━━━━━━━━━━━━━━\n\n⚠️ Haqiqatan tarixni tozalamoqchimisiz?"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=confirm_keyboard("clear_history"))
     await callback.answer()
@@ -966,11 +929,7 @@ async def cb_confirm_clear_history(callback: CallbackQuery):
         return
     async with db_pool.acquire() as conn:
         await conn.execute("DELETE FROM history")
-    text = (
-        "━━━━━━━━━━━━━━━━━━\n"
-        "✅ TARIX TOZALANDI\n"
-        "━━━━━━━━━━━━━━━━━━"
-    )
+    text = "━━━━━━━━━━━━━━━━━━\n✅ TARIX TOZALANDI\n━━━━━━━━━━━━━━━━━━"
     await callback.message.edit_text(f"<pre>{text}</pre>", parse_mode="HTML",
                                      reply_markup=back_button("back_admin"))
     await callback.answer()
@@ -987,7 +946,7 @@ async def handle_all(message: Message):
 # ================= HEALTH CHECK =================
 @app.api_route("/", methods=["GET", "HEAD"])
 async def health_check():
-    return JSONResponse({"status": "ok", "bot": "Shanbalik Bot v7.2"})
+    return JSONResponse({"status": "ok", "bot": "Shanbalik Bot v7.3"})
 
 # ================= STARTUP =================
 @app.on_event("startup")
@@ -1021,6 +980,7 @@ async def startup():
         print(f"✅ Webhook sozlandi: {WEBHOOK_URL}")
 
         scheduler.add_job(morning_weather, "cron", hour=6, minute=0)
+        scheduler.add_job(check_unconfirmed_shanbalik, "cron", hour=9, minute=0)
         scheduler.add_job(three_days_before_reminder, "cron", hour=10, minute=0)
         scheduler.add_job(two_days_before_announcement, "cron", hour=10, minute=0)
         scheduler.add_job(poll_vote_reminder, "cron", hour=18, minute=0)
@@ -1028,7 +988,7 @@ async def startup():
         scheduler.add_job(today_reminder, "cron", hour=7, minute=0)
         scheduler.start()
         print("✅ Scheduler ishga tushdi!")
-        print("✅ Bot ishga tushdi! Version 7.2")
+        print("✅ Bot ishga tushdi! Version 7.3")
 
     except Exception as e:
         print(f"❌ XATOLIK: {e}")
